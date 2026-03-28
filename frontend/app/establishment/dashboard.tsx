@@ -23,6 +23,7 @@ export default function EstablishmentDashboard() {
   const [establishment, setEstablishment] = useState<Establishment | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [financialData, setFinancialData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,12 +33,14 @@ export default function EstablishmentDashboard() {
     try {
       const est = await api.getMyEstablishment();
       setEstablishment(est);
-      const [offersData, statsData] = await Promise.all([
+      const [offersData, statsData, financial] = await Promise.all([
         api.getMyOffers(),
         api.getEstablishmentStats(est.establishment_id),
+        api.getEstablishmentFinancial().catch(() => ({ withdrawable_balance: 0, total_sales: 0 })),
       ]);
       setOffers(offersData);
       setStats(statsData.stats);
+      setFinancialData(financial);
     } catch (error: any) {
       if (error.message?.includes('No establishment')) {
         router.replace('/establishment/register');
@@ -144,6 +147,23 @@ export default function EstablishmentDashboard() {
         </View>
       </View>
 
+      {/* Créditos Recebidos (Saldo para Saque) */}
+      <View style={styles.section}>
+        <View style={styles.creditCard}>
+          <View style={styles.creditHeader}>
+            <Ionicons name="wallet" size={28} color="#10B981" />
+            <Text style={styles.creditTitle}>Créditos Recebidos</Text>
+          </View>
+          <Text style={styles.creditSubtitle}>Saldo para Saque</Text>
+          <Text style={styles.creditValue}>
+            R$ {(financialData?.withdrawable_balance || 0).toFixed(2).replace('.', ',')}
+          </Text>
+          <Text style={styles.creditInfo}>
+            Recebido de {stats?.total_sales || 0} validações de QR Code
+          </Text>
+        </View>
+      </View>
+
       {/* Quick Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ações Rápidas</Text>
@@ -232,6 +252,14 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#FFF', marginBottom: 12 },
   seeAll: { fontSize: 13, fontWeight: '600', color: '#10B981' },
+  // Credit Card Styles
+  creditCard: { backgroundColor: '#064E3B', padding: 20, borderRadius: 16, borderWidth: 2, borderColor: '#10B981' },
+  creditHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  creditTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
+  creditSubtitle: { fontSize: 13, color: '#6EE7B7', marginBottom: 8 },
+  creditValue: { fontSize: 32, fontWeight: '800', color: '#10B981', marginBottom: 8 },
+  creditInfo: { fontSize: 12, color: '#A7F3D0' },
+  // Action Card Styles
   actionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#334155' },
   actionIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   actionContent: { flex: 1 },

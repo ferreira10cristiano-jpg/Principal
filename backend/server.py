@@ -1134,9 +1134,21 @@ async def validate_qr_code(data: QRCodeValidate, user: dict = Depends(get_curren
     if qr_code["establishment_id"] != establishment["establishment_id"]:
         raise HTTPException(status_code=403, detail="QR code is for a different establishment")
     
-    # Check establishment has tokens
-    if establishment.get("token_balance", 0) < 1:
-        raise HTTPException(status_code=400, detail="Establishment has no tokens. Purchase a package.")
+    # Check establishment has tokens (SIMULATION MODE: skip for testing)
+    # if establishment.get("token_balance", 0) < 1:
+    #     raise HTTPException(status_code=400, detail="Establishment has no tokens. Purchase a package.")
+    
+    # Get offer details for credit calculation
+    offer = await db.offers.find_one({"offer_id": qr_code["for_offer_id"]}, {"_id": 0})
+    credit_amount = offer.get("discounted_price", 0) if offer else 0
+    
+    # Get purchaser
+    purchaser_id = qr_code["generated_by_user_id"]
+    
+    # Check if user has credits to pay
+    user_credits = await db.client_credits.find_one({"user_id": purchaser_id}, {"_id": 0})
+    user_credit_balance = user_credits.get("balance", 0) if user_credits else 0
+    credits_used = min(user_credit_balance, credit_amount)
     
     # Mark as used
     await db.qr_codes.update_one(
@@ -1144,24 +1156,52 @@ async def validate_qr_code(data: QRCodeValidate, user: dict = Depends(get_curren
         {"$set": {
             "used": True,
             "used_at": datetime.now(timezone.utc),
-            "validated_by_establishment_id": establishment["establishment_id"]
+            "validated_by_establishment_id": establishment["establishment_id"],
+            "credits_used": credits_used
         }}
     )
     
-    # Deduct R$2 from establishment (1 token = 1 sale = R$2)
-    await db.establishments.update_one(
-        {"establishment_id": establishment["establishment_id"]},
-        {"$inc": {"token_balance": -1, "total_sales": 1}}
-    )
+    # Deduct token from establishment (SIMULATION MODE: skip if no tokens)
+    if establishment.get("token_balance", 0) >= 1:
+        await db.establishments.update_one(
+            {"establishment_id": establishment["establishment_id"]},
+            {"$inc": {"token_balance": -1, "total_sales": 1, "withdrawable_balance": credits_used}}
+        )
+    else:
+        # In simulation mode, just increment sales and withdrawable balance
+        await db.establishments.update_one(
+            {"establishment_id": establishment["establishment_id"]},
+            {"$inc": {"total_sales": 1, "withdrawable_balance": credits_used}}
+        )
+    
+    # Deduct credits from user if they had any
+    if credits_used > 0:
+        await db.client_credits.update_one(
+            {"user_id": purchaser_id},
+            {"$inc": {"balance": -credits_used}}
+        )
+    
+    # Log in financial_logs collection for auditing
+    financial_log = {
+        "log_id": f"fin_{uuid.uuid4().hex[:12]}",
+        "type": "qr_validation",
+        "from_user_id": purchaser_id,
+        "to_establishment_id": establishment["establishment_id"],
+        "offer_id": qr_code["for_offer_id"],
+        "qr_id": qr_code["qr_id"],
+        "credits_deducted_from_user": credits_used,
+        "credits_added_to_establishment": credits_used,
+        "offer_title": offer.get("title") if offer else None,
+        "offer_price": credit_amount,
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.financial_logs.insert_one(financial_log)
     
     # Increment sales on offer
     await db.offers.update_one(
         {"offer_id": qr_code["for_offer_id"]},
         {"$inc": {"sales": 1}}
     )
-    
-    # Get purchaser
-    purchaser_id = qr_code["generated_by_user_id"]
     
     # Distribute purchase commissions to referral network
     await distribute_commissions(
@@ -1196,13 +1236,12 @@ async def validate_qr_code(data: QRCodeValidate, user: dict = Depends(get_curren
             "created_at": datetime.now(timezone.utc)
         })
     
-    # Get offer details
-    offer = await db.offers.find_one({"offer_id": qr_code["for_offer_id"]}, {"_id": 0})
-    
     return {
         "message": "QR code validated successfully",
         "offer": offer,
-        "qr_code": {**qr_code, "used": True, "used_at": datetime.now(timezone.utc).isoformat()}
+        "qr_code": {**qr_code, "used": True, "used_at": datetime.now(timezone.utc).isoformat()},
+        "credits_used": credits_used,
+        "credits_added_to_establishment": credits_used
     }
 
 @api_router.get("/qr/my-codes")
@@ -1275,6 +1314,68 @@ async def get_my_network(user: dict = Depends(get_current_user)):
         "total_referrals": len(level1_users) + len(level2_users) + len(level3_users),
         "transactions": transactions[:20],  # Last 20 transactions
         "total_earned": total_earned
+    }
+
+# ===================== ESTABLISHMENT FINANCIAL ROUTES =====================
+
+@api_router.get("/establishments/me/financial")
+async def get_establishment_financial(user: dict = Depends(get_current_user)):
+    """Get establishment financial summary (withdrawable balance and logs)"""
+    establishment = await db.establishments.find_one(
+        {"user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not establishment:
+        raise HTTPException(status_code=404, detail="No establishment found")
+    
+    # Get financial logs
+    financial_logs = await db.financial_logs.find(
+        {"to_establishment_id": establishment["establishment_id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    withdrawable_balance = establishment.get("withdrawable_balance", 0)
+    
+    return {
+        "withdrawable_balance": withdrawable_balance,
+        "total_sales": establishment.get("total_sales", 0),
+        "financial_logs": financial_logs
+    }
+
+@api_router.get("/referral/share-link")
+async def get_referral_share_link(request: Request, user: dict = Depends(get_current_user)):
+    """Get dynamic referral share link"""
+    referral_code = user.get("referral_code")
+    
+    # Get the base URL dynamically - prioritize the known preview URL
+    base_url = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "")
+    
+    if not base_url:
+        # Fallback: try to get from request
+        host = request.headers.get("host", "")
+        if host:
+            # Use https for preview environments
+            base_url = f"https://{host}"
+    
+    # Clean up the URL
+    base_url = base_url.replace("/api", "").rstrip("/")
+    
+    # Handle cluster URLs - convert to public preview URL
+    if "cluster-" in base_url and "preview.emergentcf.cloud" in base_url:
+        # Extract the job name (e.g., draft-offer-mode)
+        import re
+        match = re.search(r'(https?://)?([^.]+)\.cluster', base_url)
+        if match:
+            job_name = match.group(2)
+            base_url = f"https://{job_name}.preview.emergentagent.com"
+    
+    share_link = f"{base_url}?ref={referral_code}"
+    
+    return {
+        "referral_code": referral_code,
+        "share_link": share_link,
+        "message": f"🎉 Use meu código {referral_code} no iToke e ganhe bônus! {share_link}"
     }
 
 @api_router.get("/credits")

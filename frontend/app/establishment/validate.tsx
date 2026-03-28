@@ -108,6 +108,10 @@ export default function ValidateScreen() {
                 <Text style={styles.resultValue}>{validationResult.offer?.title}</Text>
               </View>
               <View style={styles.resultRow}>
+                <Text style={styles.resultLabel}>Código:</Text>
+                <Text style={styles.resultValue}>{validationResult.offer?.offer_code || 'N/A'}</Text>
+              </View>
+              <View style={styles.resultRow}>
                 <Text style={styles.resultLabel}>Desconto:</Text>
                 <Text style={styles.resultValue}>{validationResult.offer?.discount_value}%</Text>
               </View>
@@ -119,10 +123,28 @@ export default function ValidateScreen() {
               </View>
             </View>
 
+            {/* Credit Transfer Info */}
+            {validationResult.credits_used > 0 && (
+              <View style={styles.creditTransferCard}>
+                <Ionicons name="wallet" size={24} color="#10B981" />
+                <View style={styles.creditTransferContent}>
+                  <Text style={styles.creditTransferTitle}>Pagamento com Créditos</Text>
+                  <Text style={styles.creditTransferValue}>
+                    R$ {validationResult.credits_used?.toFixed(2).replace('.', ',')}
+                  </Text>
+                  <Text style={styles.creditTransferInfo}>
+                    Saldo adicionado ao seu perfil
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <View style={styles.deductionInfo}>
               <Ionicons name="information-circle" size={20} color="#3B82F6" />
               <Text style={styles.deductionText}>
-                1 token foi debitado do seu saldo
+                {validationResult.credits_used > 0 
+                  ? `R$ ${validationResult.credits_used?.toFixed(2)} adicionados ao seu saldo para saque`
+                  : '1 token foi debitado do seu saldo'}
               </Text>
             </View>
           </View>
@@ -281,6 +303,35 @@ const styles = StyleSheet.create({
   deductionText: {
     fontSize: 13,
     color: '#047857',
+    flex: 1,
+  },
+  // Credit Transfer Card Styles
+  creditTransferCard: {
+    flexDirection: 'row',
+    backgroundColor: '#064E3B',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+    alignItems: 'center',
+  },
+  creditTransferContent: {
+    flex: 1,
+  },
+  creditTransferTitle: {
+    fontSize: 14,
+    color: '#A7F3D0',
+    fontWeight: '500',
+  },
+  creditTransferValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#10B981',
+    marginVertical: 4,
+  },
+  creditTransferInfo: {
+    fontSize: 12,
+    color: '#6EE7B7',
   },
   infoCard: {
     flexDirection: 'row',

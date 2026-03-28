@@ -175,6 +175,22 @@ class ApiClient {
     return this.request<any>(`/establishments/${establishmentId}/stats`);
   }
 
+  async getEstablishmentFinancial() {
+    return this.request<{
+      withdrawable_balance: number;
+      total_sales: number;
+      financial_logs: any[];
+    }>('/establishments/me/financial');
+  }
+
+  async getReferralShareLink() {
+    return this.request<{
+      referral_code: string;
+      share_link: string;
+      message: string;
+    }>('/referral/share-link');
+  }
+
   // Client Token Purchase
   async purchaseTokens(packages: number) {
     return this.request<{
