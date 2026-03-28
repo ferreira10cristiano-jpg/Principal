@@ -1,0 +1,35 @@
+{
+  "summary": "Completed backend testing for QR generation credits issues and commission distribution. All reported bugs have been verified as fixed.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "POST /api/qr/generate with use_credits=5.50 returns credits_reserved in response",
+    "POST /api/qr/generate without credits returns credits_reserved=0",
+    "POST /api/tokens/purchase does NOT give credits to purchaser themselves",
+    "distribute_commissions only gives credits to referrers, not purchaser",
+    "QR generation correctly reserves credits and deducts from user balance",
+    "Commission distribution works correctly in referral chain",
+    "Authentication and session management working properly",
+    "Token purchase adds correct amount of tokens to purchaser",
+    "Referral system correctly applies and tracks relationships"
+  ],
+  "test_report_links": [
+    "/app/backend_test_focused.py",
+    "/app/backend_test_credits.py"
+  ],
+  "action_item_for_main_agent": "",
+  "updated_files": [
+    "/app/backend_test_focused.py",
+    "/app/backend_test_credits.py"
+  ],
+  "success_percentage": "backend: 100%",
+  "should_call_test_agent_after_fix": "false",
+  "should_main_agent_test_itself": "true"
+}

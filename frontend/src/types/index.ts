@@ -72,10 +72,12 @@ export interface TokenPackage {
 export interface QRCode {
   qr_id: string;
   code_hash: string;
-  offer_code?: string;  // Short offer code for manual lookup
+  offer_code?: string;
   generated_by_user_id: string;
   for_offer_id: string;
   establishment_id: string;
+  credits_reserved?: number;
+  credits_used_on_generation?: number;
   used: boolean;
   used_at?: string;
   validated_by_establishment_id?: string;

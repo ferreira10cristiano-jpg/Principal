@@ -380,7 +380,7 @@ async def process_referral(new_user_id: str, referral_code: str):
             })
 
 async def distribute_commissions(purchaser_id: str, amount: float, transaction_type: str, related_id: str, packages_qty: int = 1):
-    """Distribute R$1 per package commissions to 3 levels of referrers"""
+    """Distribute R$1 per package commissions to 3 levels of referrers (NOT to the purchaser themselves)"""
     # Get all referrers for this user
     referrals = await db.referral_network.find(
         {"child_user_id": purchaser_id},
@@ -388,6 +388,10 @@ async def distribute_commissions(purchaser_id: str, amount: float, transaction_t
     ).to_list(3)
     
     for ref in referrals:
+        # IMPORTANT: Never give commission to the purchaser themselves
+        if ref["parent_user_id"] == purchaser_id:
+            continue
+            
         commission = 1.00 * packages_qty  # R$1 per package per level
         
         # Add to referrer's credits

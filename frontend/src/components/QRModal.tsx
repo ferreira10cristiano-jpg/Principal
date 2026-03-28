@@ -124,6 +124,27 @@ export const QRModal: React.FC<QRModalProps> = ({
                   {qrCode.offer_code && (
                     <Text style={styles.offerCodeText}>Código: {qrCode.offer_code}</Text>
                   )}
+                  
+                  {/* Show credits reserved info */}
+                  {(qrCode.credits_reserved > 0 || qrCode.credits_used_on_generation > 0) && (
+                    <View style={styles.creditsUsedInfo}>
+                      <Ionicons name="wallet" size={18} color="#3B82F6" />
+                      <Text style={styles.creditsUsedText}>
+                        Créditos reservados: R$ {(qrCode.credits_reserved || qrCode.credits_used_on_generation || 0).toFixed(2).replace('.', ',')}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Show final price to pay */}
+                  {offer && (
+                    <View style={styles.finalPriceInfo}>
+                      <Text style={styles.finalPriceLabel}>Valor a pagar no estabelecimento:</Text>
+                      <Text style={styles.finalPriceValue}>
+                        R$ {Math.max(0, (offer.discounted_price - (qrCode.credits_reserved || qrCode.credits_used_on_generation || 0))).toFixed(2).replace('.', ',')}
+                      </Text>
+                    </View>
+                  )}
+                  
                   <Text style={styles.expiresText}>{getExpiresIn()}</Text>
 
                   <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
@@ -376,6 +397,39 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  creditsUsedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E3A5F',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 12,
+    gap: 8,
+  },
+  creditsUsedText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#60A5FA',
+  },
+  finalPriceInfo: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  finalPriceLabel: {
+    fontSize: 12,
+    color: '#A7F3D0',
+    marginBottom: 4,
+  },
+  finalPriceValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#10B981',
   },
   generateContainer: {
     paddingVertical: 10,
