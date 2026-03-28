@@ -335,7 +335,7 @@ export default function MyQRScreen() {
       />
 
       {/* Info footer */}
-      <View style={[styles.infoFooter, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[styles.infoFooter, { paddingBottom: insets.bottom + 8 }]} pointerEvents="none">
         <Ionicons name="information-circle" size={16} color="#64748B" />
         <Text style={styles.infoFooterText}>
           QR Codes não utilizados expiram em 6 meses
