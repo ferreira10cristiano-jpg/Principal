@@ -1,76 +1,56 @@
 # PRD - Plataforma de Ofertas de Estabelecimentos (iToke)
 
 ## Problem Statement
-Plataforma de fidelidade e ofertas para estabelecimentos e clientes. Estabelecimentos criam ofertas com descontos, clientes geram QR Codes (vouchers) para resgatar ofertas, e o sistema rastreia vendas, créditos e comissões de indicação.
+Plataforma de fidelidade e ofertas para estabelecimentos e clientes. Estabelecimentos criam ofertas com descontos, clientes geram QR Codes (vouchers) para resgatar ofertas, e o sistema rastreia vendas, creditos e comissoes de indicacao.
 
 ## Arquitetura
 
 ### Backend (FastAPI + MongoDB)
 - **Collections**: `establishments`, `offers`, `users`, `sessions`, `qr_codes`, `vouchers`, `sales_history`, `financial_logs`, `client_tokens`, `client_credits`, `referral_network`, `transactions`
 - **Endpoints Principais**:
-  - `POST /api/auth/email-login` - Login via email (modo teste)
-  - `POST/GET/PUT /api/establishments/{id}` - Gerenciamento do estabelecimento
-  - `GET /api/establishments/me/financial` - Saldo para saque
-  - `GET /api/establishments/me/sales-history` - Histórico de vendas
-  - `POST/GET /api/offers` - Gerenciamento de ofertas
-  - `POST /api/qr/generate` - Geração de voucher QR (deduz 1 token + créditos opcionais IMEDIATO)
-  - `POST /api/qr/validate` - Validação via code_hash ou backup_code, transfere créditos ao estabelecimento
-  - `GET /api/vouchers/my` - Vouchers do cliente com credits_used e final_price_to_pay
-  - `POST /api/vouchers/{id}/cancel` - Cancela voucher ativo e DEVOLVE créditos ao cliente
-  - `GET /api/referral/share-link` - Link dinâmico de indicação
+  - `POST /api/auth/email-login` - Login via email
+  - `POST /api/qr/generate` - Gera voucher QR (deduz 1 token + creditos IMEDIATO)
+  - `POST /api/qr/validate` - Step 1: Preview do voucher (sem finalizar)
+  - `POST /api/qr/confirm` - Step 2: Confirma recebimento, finaliza venda
+  - `GET /api/vouchers/my` - Vouchers do cliente
+  - `POST /api/vouchers/{id}/cancel` - Cancela e devolve creditos
+  - `GET /api/establishments/me/sales-history` - Historico de vendas
 
 ### Frontend (Expo React Native Web)
-- `/(tabs)/qr` - "Meus QR" com breakdown de preço (créditos usados, valor no balcão), botão cancelar
-- `/qr-fullscreen` - QR Code scrollable com backup code + detalhes de preço
-- `/offer/[id]` - QRModal scrollable com toggle de créditos
-- `/establishment/validate` - Validação QR com câmera (expo-camera) + input manual
+- **QRModal**: Input de creditos com botao MAX integrado, auto-fill, calculo em tempo real
+- **QR Fullscreen**: Valor Original (riscado), Creditos Aplicados (vermelho), Valor Final (verde)
+- **Meus QR**: Cards com breakdown de preco, backup code, botao cancelar
+- **Validate (Estabelecimento)**: Fluxo 2 etapas (scan → preview → confirmar recebimento)
 
 ## Implementation Log
-- **25/03/2026**: Implementação completa da refatoração inicial
-- **26/03/2026**: Restauração do código do GitHub + Mock Auth
-- **28/03/2026**: Bug Fix - Botão "Publicar Oferta", Código Identificador, Referral Links, Financial Dashboard
-- **28/03/2026**: QR Code com Créditos - Fluxo Financeiro Completo
-- **28/03/2026**: CRITICAL REFACTOR - Vouchers persistidos, backup codes (ITK-XXX), câmera scanner
-- **28/03/2026**: FIX - MongoDB ObjectId serialization em /api/qr/validate
-- **28/03/2026**: URGENT REFACTOR - Data persistence, credit deduction, scrollable UI, cancel/refund
+- **25-28/03/2026**: MVP completo com ofertas, QR codes, validacao
+- **28/03/2026**: CRITICAL REFACTOR - Vouchers persistidos, backup codes, camera scanner
+- **28/03/2026**: URGENT REFACTOR - Deducao imediata de creditos, cancelamento com devolucao
+- **28/03/2026**: FINAL POLISH - MAX button fix, QR enriquecido, validacao 2 etapas, input sanitization
 
 ## Core Requirements (Implementados)
-- [x] MODO SIMULAÇÃO: Criação de ofertas sem verificação de tokens
-- [x] CÓDIGO DA OFERTA: Formato OFF-XXXXXX para rastreamento
-- [x] LINKS DE REFERÊNCIA DINÂMICOS
-- [x] CRÉDITOS RECEBIDOS: Dashboard do estabelecimento
-- [x] FLUXO DE CRÉDITOS COMPLETO:
-  - [x] Dedução IMEDIATA de créditos do cliente na geração do QR
-  - [x] Transferência de créditos ao estabelecimento na validação
-  - [x] Devolução de créditos ao cancelar voucher
-  - [x] Log de transações para histórico na carteira
-- [x] VOUCHERS PERSISTIDOS: credits_used, final_price_to_pay, original_price salvo no DB
-- [x] SALES HISTORY: Registro completo de vendas
-- [x] VALIDAÇÃO QR: Suporte a code_hash e backup_code (ITK-XXX)
-- [x] CÂMERA SCANNER: expo-camera na tela de validação
-- [x] MEUS QR com breakdown de preço e botão cancelar
-- [x] QR FULLSCREEN SCROLLABLE com backup code + detalhes financeiros
-- [x] QR MODAL SCROLLABLE sem auto-close
-- [x] LAYOUT RESPONSIVO: Textos sem corte em telas pequenas
-
-## Tech Stack
-- Backend: FastAPI, Motor (async MongoDB), Pydantic
-- Frontend: Expo (React Native Web), Expo Router, Zustand, expo-camera
-- AI: Gemini 3.1 Flash Image Preview (via Emergent LLM Key)
+- [x] Modo Simulacao para ofertas
+- [x] Codigo da Oferta (OFF-XXXXXX)
+- [x] Links de referencia dinamicos
+- [x] Dashboard financeiro do estabelecimento
+- [x] Fluxo completo de creditos (deducao, transferencia, devolucao)
+- [x] Vouchers persistidos com credits_used, final_price_to_pay, original_price
+- [x] Validacao 2 etapas (preview + confirmar recebimento)
+- [x] QR Modal com MAX button integrado, auto-fill, calculo real-time
+- [x] QR Fullscreen enriquecido (Valor Original, Creditos, Valor Final)
+- [x] Cancelamento com devolucao de creditos
+- [x] Camera scanner com scan frame e throttle
+- [x] Input sanitization (apenas numeros/decimais)
+- [x] Financial logs com status "totalmente_pago"
+- [x] Sem falsos erros em creditos parciais
 
 ## Backlog
-
-### P1 (Alta Prioridade)
-- [ ] Edição de ofertas existentes
+### P1
+- [ ] Edicao de ofertas existentes
 - [ ] Busca Digital no Media Hub
 
-### P2 (Média Prioridade)
-- [ ] Restaurar autenticação Google OAuth
+### P2
+- [ ] Restaurar Google OAuth
 - [ ] Filtro de ofertas por cidade/bairro
-- [ ] Refatorar server.py (>2200 linhas) em FastAPI APIRouters
-- [ ] Adicionar histórico completo de transações do cliente
-
-## Next Tasks
-1. Implementar edição de ofertas existentes
-2. Refatorar server.py em módulos
-3. Histórico de transações do cliente na carteira
+- [ ] Refatorar server.py em APIRouters
+- [ ] Historico completo de transacoes do cliente
