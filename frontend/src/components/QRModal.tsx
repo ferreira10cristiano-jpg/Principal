@@ -126,8 +126,18 @@ export const QRModal: React.FC<QRModalProps> = ({
                     />
                   </View>
                   <Text style={styles.codeText}>{qrCode.code_hash}</Text>
+                  
+                  {/* Backup Code for manual entry */}
+                  {qrCode.backup_code && (
+                    <View style={styles.backupCodeContainer}>
+                      <Text style={styles.backupCodeLabel}>Código de Backup:</Text>
+                      <Text style={styles.backupCodeValue}>{qrCode.backup_code}</Text>
+                      <Text style={styles.backupCodeHint}>Use se a câmera não funcionar</Text>
+                    </View>
+                  )}
+                  
                   {qrCode.offer_code && (
-                    <Text style={styles.offerCodeText}>Código: {qrCode.offer_code}</Text>
+                    <Text style={styles.offerCodeText}>Oferta: {qrCode.offer_code}</Text>
                   )}
                   
                   {/* Show credits reserved info */}
@@ -145,7 +155,7 @@ export const QRModal: React.FC<QRModalProps> = ({
                     <View style={styles.finalPriceInfo}>
                       <Text style={styles.finalPriceLabel}>Valor a pagar no estabelecimento:</Text>
                       <Text style={styles.finalPriceValue}>
-                        R$ {Math.max(0, (offer.discounted_price - (qrCode.credits_reserved || qrCode.credits_used_on_generation || 0))).toFixed(2).replace('.', ',')}
+                        R$ {(qrCode.final_price_to_pay ?? Math.max(0, (offer.discounted_price - (qrCode.credits_reserved || 0)))).toFixed(2).replace('.', ',')}
                       </Text>
                     </View>
                   )}
@@ -375,6 +385,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
+  },
+  backupCodeContainer: {
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+  },
+  backupCodeLabel: {
+    fontSize: 11,
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  backupCodeValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#78350F',
+    letterSpacing: 3,
+  },
+  backupCodeHint: {
+    fontSize: 10,
+    color: '#B45309',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   expiresText: {
     marginTop: 8,

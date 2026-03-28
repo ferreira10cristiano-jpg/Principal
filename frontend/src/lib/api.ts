@@ -239,6 +239,29 @@ class ApiClient {
     });
   }
 
+  async getMyVouchers() {
+    return this.request<any[]>('/vouchers/my');
+  }
+
+  async getSalesHistory() {
+    return this.request<{
+      sales: any[];
+      summary: {
+        total_sales: number;
+        total_credits_received: number;
+        total_cash_to_receive: number;
+        withdrawable_balance: number;
+      };
+    }>('/establishments/me/sales-history');
+  }
+
+  async validateQR(codeHash: string) {
+    return this.request<any>('/qr/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code_hash: codeHash }),
+    });
+  }
+
   async validateQR(codeHash: string) {
     return this.request<any>('/qr/validate', {
       method: 'POST',

@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for iToke Platform - QR Generation and Credits Issues
-Testing the specific issues reported:
-1. 'Invalid session' error when generating QR Code - need to verify authentication
-2. Client credits not showing on QR generation screen - need to show token and credit balance with option to choose
+Backend API Testing for iToke Platform - Voucher System with Backup Codes
+Testing the specific features implemented:
+1. POST /api/qr/generate - deve retornar backup_code no formato ITK-XXX
+2. POST /api/qr/generate - deve salvar em vouchers collection
+3. GET /api/vouchers/my - deve retornar vouchers do cliente
+4. POST /api/qr/validate com backup_code - deve validar corretamente
+5. POST /api/qr/validate - deve retornar credits_used e amount_to_pay_cash
+6. GET /api/establishments/me/sales-history - deve retornar histórico e sumário
 """
 
 import requests
 import sys
 import json
+import re
 from datetime import datetime
 
 class iTokeTester:
@@ -156,9 +161,9 @@ class iTokeTester:
                 return False, response
         return False, {}
 
-    def test_qr_generation_with_tokens(self, offer_id):
-        """Test POST /api/qr/generate with use_credits=0 (should use token)"""
-        print("\n🎫 Testing QR Generation with Tokens...")
+    def test_qr_generation_with_backup_code(self, offer_id):
+        """Test POST /api/qr/generate - should return backup_code in ITK-XXX format"""
+        print("\n🎫 Testing QR Generation with Backup Code...")
         
         qr_data = {
             "offer_id": offer_id,
@@ -166,7 +171,7 @@ class iTokeTester:
         }
         
         success, response = self.run_test(
-            "POST /api/qr/generate (use tokens)",
+            "POST /api/qr/generate (backup code format)",
             "POST",
             "/qr/generate",
             200,
@@ -174,36 +179,141 @@ class iTokeTester:
         )
         
         if success:
+            backup_code = response.get('backup_code')
             print(f"   QR ID: {response.get('qr_id', 'N/A')}")
             print(f"   Code Hash: {response.get('code_hash', 'N/A')}")
+            print(f"   Backup Code: {backup_code}")
             print(f"   Offer Code: {response.get('offer_code', 'N/A')}")
-            print(f"   Credits Used: {response.get('credits_used_on_generation', 0)}")
+            
+            # Verify backup code format ITK-XXX
+            if backup_code and re.match(r'^ITK-[A-Z0-9]{3}$', backup_code):
+                self.log_test("Backup code format ITK-XXX", True, f"Format correct: {backup_code}")
+            else:
+                self.log_test("Backup code format ITK-XXX", False, f"Invalid format: {backup_code}")
+                
             return True, response
         return False, {}
 
-    def test_qr_generation_with_credits(self, offer_id):
-        """Test POST /api/qr/generate with use_credits=1 (should use credits if available)"""
-        print("\n💳 Testing QR Generation with Credits...")
-        
-        qr_data = {
-            "offer_id": offer_id,
-            "use_credits": 1
-        }
+    def test_vouchers_my_endpoint(self):
+        """Test GET /api/vouchers/my - should return client's vouchers"""
+        print("\n📋 Testing GET /api/vouchers/my...")
         
         success, response = self.run_test(
-            "POST /api/qr/generate (use credits)",
-            "POST",
-            "/qr/generate",
-            200,
-            data=qr_data
+            "GET /api/vouchers/my",
+            "GET",
+            "/vouchers/my",
+            200
         )
         
         if success:
-            print(f"   QR ID: {response.get('qr_id', 'N/A')}")
-            print(f"   Code Hash: {response.get('code_hash', 'N/A')}")
-            print(f"   Offer Code: {response.get('offer_code', 'N/A')}")
-            print(f"   Credits Used: {response.get('credits_used_on_generation', 0)}")
+            vouchers_count = len(response) if isinstance(response, list) else 0
+            print(f"   Found {vouchers_count} vouchers")
+            
+            if vouchers_count > 0:
+                voucher = response[0]
+                print(f"   First voucher ID: {voucher.get('voucher_id', 'N/A')}")
+                print(f"   Backup code: {voucher.get('backup_code', 'N/A')}")
+                print(f"   Status: {voucher.get('status', 'N/A')}")
+                print(f"   Final price to pay: R$ {voucher.get('final_price_to_pay', 0):.2f}")
+                
+                # Verify voucher has required fields
+                required_fields = ['voucher_id', 'backup_code', 'offer_title', 'status']
+                missing_fields = [field for field in required_fields if field not in voucher]
+                
+                if not missing_fields:
+                    self.log_test("Voucher has required fields", True, "All required fields present")
+                else:
+                    self.log_test("Voucher has required fields", False, f"Missing: {missing_fields}")
+                    
+                return True, response
+            else:
+                self.log_test("Vouchers found", False, "No vouchers returned")
+                return False, response
+        return False, {}
+
+    def test_qr_validate_with_backup_code(self, backup_code):
+        """Test POST /api/qr/validate with backup_code - should validate correctly"""
+        print(f"\n✅ Testing QR Validation with Backup Code: {backup_code}")
+        
+        validate_data = {
+            "code_hash": backup_code  # API accepts backup_code in code_hash field
+        }
+        
+        success, response = self.run_test(
+            "POST /api/qr/validate (backup code)",
+            "POST",
+            "/qr/validate",
+            200,
+            data=validate_data
+        )
+        
+        if success:
+            print(f"   Success: {response.get('success', False)}")
+            print(f"   Message: {response.get('message', 'N/A')}")
+            print(f"   Customer: {response.get('customer_name', 'N/A')}")
+            print(f"   Credits used: R$ {response.get('credits_used', 0):.2f}")
+            print(f"   Amount to pay cash: R$ {response.get('amount_to_pay_cash', 0):.2f}")
+            
+            # Verify response has required fields
+            required_fields = ['success', 'credits_used', 'amount_to_pay_cash']
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                self.log_test("Validation response has required fields", True, "All required fields present")
+            else:
+                self.log_test("Validation response has required fields", False, f"Missing: {missing_fields}")
+                
             return True, response
+        return False, {}
+
+    def test_sales_history_endpoint(self):
+        """Test GET /api/establishments/me/sales-history - should return history and summary"""
+        print("\n📊 Testing GET /api/establishments/me/sales-history...")
+        
+        success, response = self.run_test(
+            "GET /api/establishments/me/sales-history",
+            "GET",
+            "/establishments/me/sales-history",
+            200
+        )
+        
+        if success:
+            sales = response.get('sales', [])
+            summary = response.get('summary', {})
+            
+            print(f"   Sales count: {len(sales)}")
+            print(f"   Total sales: {summary.get('total_sales', 0)}")
+            print(f"   Total credits received: R$ {summary.get('total_credits_received', 0):.2f}")
+            print(f"   Total cash to receive: R$ {summary.get('total_cash_to_receive', 0):.2f}")
+            
+            # Verify response structure
+            if 'sales' in response and 'summary' in response:
+                self.log_test("Sales history has correct structure", True, "Has sales and summary")
+                
+                # Check if sales have required fields
+                if len(sales) > 0:
+                    sale = sales[0]
+                    required_sale_fields = ['sale_id', 'customer_name', 'offer_title', 'credits_used', 'amount_to_pay_cash']
+                    missing_sale_fields = [field for field in required_sale_fields if field not in sale]
+                    
+                    if not missing_sale_fields:
+                        self.log_test("Sale records have required fields", True, "All required fields present")
+                    else:
+                        self.log_test("Sale records have required fields", False, f"Missing: {missing_sale_fields}")
+                
+                # Check summary fields
+                required_summary_fields = ['total_sales', 'total_credits_received', 'total_cash_to_receive']
+                missing_summary_fields = [field for field in required_summary_fields if field not in summary]
+                
+                if not missing_summary_fields:
+                    self.log_test("Summary has required fields", True, "All required fields present")
+                else:
+                    self.log_test("Summary has required fields", False, f"Missing: {missing_summary_fields}")
+                    
+                return True, response
+            else:
+                self.log_test("Sales history has correct structure", False, "Missing sales or summary")
+                return False, response
         return False, {}
 
     def test_insufficient_balance_scenarios(self, offer_id):
@@ -415,14 +525,14 @@ class iTokeTester:
 
     def run_comprehensive_test(self):
         """Run all tests in sequence"""
-        print("🚀 Starting iToke Backend API Tests - QR Generation & Credits")
-        print("=" * 70)
+        print("🚀 Starting iToke Backend API Tests - Voucher System with Backup Codes")
+        print("=" * 80)
         
         # Test 1: Client Login
         print("\n=== CLIENT AUTHENTICATION TESTS ===")
         client_success, client_data = self.test_client_login()
         if not client_success:
-            print("❌ Client login failed - cannot continue with QR tests")
+            print("❌ Client login failed - cannot continue with tests")
             return False
         
         # Test 2: Auth/me endpoint
@@ -437,27 +547,60 @@ class iTokeTester:
             print("❌ Could not get test offer ID - cannot test QR generation")
             return False
         
-        print(f"\n=== QR GENERATION TESTS (Offer ID: {offer_id}) ===")
+        print(f"\n=== VOUCHER SYSTEM TESTS (Offer ID: {offer_id}) ===")
         
-        # Test 4: QR Generation with tokens
-        token_qr_success, token_qr_data = self.test_qr_generation_with_tokens(offer_id)
+        # Test 4: QR Generation with backup code format
+        qr_success, qr_data = self.test_qr_generation_with_backup_code(offer_id)
+        if not qr_success:
+            print("❌ QR generation failed - cannot continue with validation tests")
+            return False
         
-        # Test 5: QR Generation with credits (if user has credits)
-        if auth_data.get('credits', 0) >= 1:
-            credit_qr_success, credit_qr_data = self.test_qr_generation_with_credits(offer_id)
-        else:
-            print("⚠️ User has no credits, skipping credit QR generation test")
-            credit_qr_success = True  # Skip this test
+        backup_code = qr_data.get('backup_code')
         
-        # Test 6: Insufficient balance scenarios
-        self.test_insufficient_balance_scenarios(offer_id)
+        # Test 5: Get client vouchers
+        vouchers_success, vouchers_data = self.test_vouchers_my_endpoint()
         
-        # Test 7: Establishment login (for completeness)
-        print("\n=== ESTABLISHMENT AUTHENTICATION TESTS ===")
+        # Test 6: Switch to establishment for validation and sales history
+        print("\n=== ESTABLISHMENT TESTS ===")
+        old_token = self.session_token
+        
         if self.test_establishment_login():
-            self.test_get_establishment()
+            if self.test_get_establishment():
+                # Test 7: QR Validation with backup code
+                if backup_code:
+                    validation_success, validation_data = self.test_qr_validate_with_backup_code(backup_code)
+                else:
+                    print("⚠️ No backup code available, skipping validation test")
+                    validation_success = False
+                
+                # Test 8: Sales history
+                sales_history_success, sales_data = self.test_sales_history_endpoint()
+            else:
+                print("❌ Could not get establishment data")
+                validation_success = False
+                sales_history_success = False
+        else:
+            print("❌ Establishment login failed")
+            validation_success = False
+            sales_history_success = False
         
-        return True
+        # Restore client token
+        self.session_token = old_token
+        
+        # Summary of critical tests
+        critical_tests = [
+            ("QR Generation with backup code", qr_success),
+            ("Vouchers endpoint", vouchers_success),
+            ("QR Validation with backup code", validation_success),
+            ("Sales history endpoint", sales_history_success)
+        ]
+        
+        print(f"\n=== CRITICAL FEATURES SUMMARY ===")
+        for test_name, success in critical_tests:
+            status = "✅ PASS" if success else "❌ FAIL"
+            print(f"{status} {test_name}")
+        
+        return all(success for _, success in critical_tests)
 
     def print_summary(self):
         """Print test summary"""
@@ -490,10 +633,10 @@ def main():
         tester.print_summary()
         
         if success:
-            print("\n🎉 All tests passed! QR generation and authentication appear to be working.")
+            print("\n🎉 All critical voucher system features are working correctly!")
             return 0
         else:
-            print("\n⚠️  Some tests failed. There may be issues with QR generation or authentication.")
+            print("\n⚠️  Some critical features failed. Check the voucher system implementation.")
             return 1
             
     except KeyboardInterrupt:
