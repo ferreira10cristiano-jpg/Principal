@@ -1,4 +1,4 @@
-# PRD - Plataforma de Ofertas de Estabelecimentos
+# PRD - Plataforma de Ofertas de Estabelecimentos (iToke)
 
 ## Problem Statement
 Refatoração do perfil "Estabelecimento" com separação de dados fixos (perfil) e variáveis (oferta), limpeza de campos duplicados, Hub de Mídia funcional e automação de links do Instagram.
@@ -39,6 +39,7 @@ Refatoração do perfil "Estabelecimento" com separação de dados fixos (perfil
 - [x] Link do Instagram clicável no perfil e home
 - [x] CNPJ com validação algorítmica
 - [x] Wizard 4 passos: Info → Regras → Localização → Preview
+- [x] **MODO SIMULAÇÃO**: Criação de ofertas sem verificação de tokens
 
 ## Implementation Log
 - **25/03/2026**: Implementação completa da refatoração inicial
@@ -50,16 +51,49 @@ Refatoração do perfil "Estabelecimento" com separação de dados fixos (perfil
   - PROTEÇÃO DE ROTA: Dashboards protegidos por autenticação
   - PERSISTÊNCIA: Após logout, não é possível voltar via botão Back do browser
   - Corrigido logout em: Customer Profile, Establishment Dashboard, Admin Dashboard, Representative Dashboard
+- **28/03/2026**: **Bug Fix - Botão "Publicar Oferta" não funcionava**
+  - **Problema**: Botão ficava processando e retornava sem criar oferta
+  - **Causa**: Verificação de token_balance bloqueava criação após primeira oferta
+  - **Solução**: Desabilitado verificação de tokens para permitir modo simulação
+  - **Arquivo modificado**: `/app/backend/server.py` (linhas 733-737)
+  - **Bug adicional corrigido**: `social_links.get()` retornava None causando erro
 
 ## Tech Stack
 - Backend: FastAPI, Motor (async MongoDB), Pydantic
 - Frontend: Expo (React Native Web), Expo Router, Zustand
 - AI: Gemini 3.1 Flash Image Preview (via Emergent LLM Key)
 
+## What's Been Implemented
+- [x] Sistema de autenticação (email login para testes)
+- [x] CRUD de estabelecimentos
+- [x] CRUD de ofertas com wizard de 4 passos
+- [x] Hub de mídia (câmera, galeria, IA, URL)
+- [x] Sistema de QR Code para redenção de ofertas
+- [x] Dashboard do estabelecimento com métricas
+- [x] Feed de ofertas para clientes
+- [x] **MODO SIMULAÇÃO** - Ofertas criadas sem verificação de tokens
+
 ## Backlog
-- P1: Edição de ofertas existentes
-- P1: Implementar "Busca Digital" (pesquisa de imagens na web) no Media Hub
-- P2: Restaurar autenticação Firebase real
-- P2: Filtro de ofertas por cidade/bairro
-- P2: Preview de imagem antes de publicar
-- P3: Categorias de ofertas
+### P0 (Crítico)
+- [x] Bug Fix: Botão "Publicar Oferta" não funcionava (RESOLVIDO)
+
+### P1 (Alta Prioridade)
+- [ ] Edição de ofertas existentes
+- [ ] Implementar "Busca Digital" (pesquisa de imagens na web) no Media Hub
+- [ ] Preview de imagem antes de publicar
+
+### P2 (Média Prioridade)
+- [ ] Restaurar autenticação Firebase/Google OAuth real
+- [ ] Filtro de ofertas por cidade/bairro
+- [ ] Categorias de ofertas
+- [ ] Notificações push para novas ofertas
+
+### P3 (Baixa Prioridade)
+- [ ] Sistema de avaliações
+- [ ] Histórico de ofertas resgatadas
+- [ ] Relatórios avançados para estabelecimentos
+
+## Next Tasks
+1. Testar fluxo completo de criação de ofertas no frontend
+2. Implementar edição de ofertas existentes
+3. Adicionar funcionalidade de "Busca Digital" no Hub de Mídia
