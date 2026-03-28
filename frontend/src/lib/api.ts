@@ -218,10 +218,10 @@ class ApiClient {
   }
 
   // QR Codes
-  async generateQR(offerId: string) {
+  async generateQR(offerId: string, useCredits?: number) {
     return this.request<any>('/qr/generate', {
       method: 'POST',
-      body: JSON.stringify({ offer_id: offerId }),
+      body: JSON.stringify({ offer_id: offerId, use_credits: useCredits || 0 }),
     });
   }
 

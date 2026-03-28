@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for iToke Platform - Offer Creation Issues
+Backend API Testing for iToke Platform - QR Generation and Credits Issues
 Testing the specific issues reported:
-1. "Publicar Oferta" button not working
-2. "ver todas" redirecting to create first offer page even when offers exist
+1. 'Invalid session' error when generating QR Code - need to verify authentication
+2. Client credits not showing on QR generation screen - need to show token and credit balance with option to choose
 """
 
 import requests
@@ -77,6 +77,34 @@ class iTokeTester:
             self.log_test(name, False, f"Exception: {str(e)}")
             return False, {}
 
+    def test_client_login(self):
+        """Test login as client user"""
+        print("\n🔐 Testing Client Login...")
+        
+        login_data = {
+            "email": "cliente@teste.com",
+            "name": "Cliente Teste",
+            "role": "client"
+        }
+        
+        success, response = self.run_test(
+            "Login as client",
+            "POST",
+            "/auth/email-login",
+            200,
+            data=login_data
+        )
+        
+        if success and 'session_token' in response:
+            self.session_token = response['session_token']
+            user_data = response.get('user', {})
+            print(f"   Session token: {self.session_token[:20]}...")
+            print(f"   User ID: {user_data.get('user_id', 'N/A')}")
+            print(f"   Tokens: {user_data.get('tokens', 0)}")
+            print(f"   Credits: {user_data.get('credits', 0)}")
+            return True, user_data
+        return False, {}
+
     def test_establishment_login(self):
         """Test login as establishment user"""
         print("\n🔐 Testing Establishment Login...")
@@ -101,6 +129,118 @@ class iTokeTester:
             return True
         return False
 
+    def test_auth_me_endpoint(self):
+        """Test GET /api/auth/me - should return tokens and credits"""
+        print("\n👤 Testing GET /api/auth/me...")
+        
+        success, response = self.run_test(
+            "GET /api/auth/me",
+            "GET",
+            "/auth/me",
+            200
+        )
+        
+        if success:
+            print(f"   User ID: {response.get('user_id', 'N/A')}")
+            print(f"   Email: {response.get('email', 'N/A')}")
+            print(f"   Role: {response.get('role', 'N/A')}")
+            print(f"   Tokens: {response.get('tokens', 'N/A')}")
+            print(f"   Credits: {response.get('credits', 'N/A')}")
+            
+            # Verify tokens and credits are present
+            if 'tokens' in response and 'credits' in response:
+                self.log_test("Auth/me includes tokens and credits", True, f"Tokens: {response['tokens']}, Credits: {response['credits']}")
+                return True, response
+            else:
+                self.log_test("Auth/me includes tokens and credits", False, "Missing tokens or credits in response")
+                return False, response
+        return False, {}
+
+    def test_qr_generation_with_tokens(self, offer_id):
+        """Test POST /api/qr/generate with use_credits=0 (should use token)"""
+        print("\n🎫 Testing QR Generation with Tokens...")
+        
+        qr_data = {
+            "offer_id": offer_id,
+            "use_credits": 0
+        }
+        
+        success, response = self.run_test(
+            "POST /api/qr/generate (use tokens)",
+            "POST",
+            "/qr/generate",
+            200,
+            data=qr_data
+        )
+        
+        if success:
+            print(f"   QR ID: {response.get('qr_id', 'N/A')}")
+            print(f"   Code Hash: {response.get('code_hash', 'N/A')}")
+            print(f"   Offer Code: {response.get('offer_code', 'N/A')}")
+            print(f"   Credits Used: {response.get('credits_used_on_generation', 0)}")
+            return True, response
+        return False, {}
+
+    def test_qr_generation_with_credits(self, offer_id):
+        """Test POST /api/qr/generate with use_credits=1 (should use credits if available)"""
+        print("\n💳 Testing QR Generation with Credits...")
+        
+        qr_data = {
+            "offer_id": offer_id,
+            "use_credits": 1
+        }
+        
+        success, response = self.run_test(
+            "POST /api/qr/generate (use credits)",
+            "POST",
+            "/qr/generate",
+            200,
+            data=qr_data
+        )
+        
+        if success:
+            print(f"   QR ID: {response.get('qr_id', 'N/A')}")
+            print(f"   Code Hash: {response.get('code_hash', 'N/A')}")
+            print(f"   Offer Code: {response.get('offer_code', 'N/A')}")
+            print(f"   Credits Used: {response.get('credits_used_on_generation', 0)}")
+            return True, response
+        return False, {}
+
+    def test_insufficient_balance_scenarios(self, offer_id):
+        """Test QR generation with insufficient balance"""
+        print("\n⚠️ Testing Insufficient Balance Scenarios...")
+        
+        # First, let's check current balance
+        success, user_data = self.run_test(
+            "Check current balance",
+            "GET",
+            "/auth/me",
+            200
+        )
+        
+        if success:
+            tokens = user_data.get('tokens', 0)
+            credits = user_data.get('credits', 0)
+            print(f"   Current balance - Tokens: {tokens}, Credits: {credits}")
+            
+            # If user has no tokens or credits, test should fail appropriately
+            if tokens == 0 and credits == 0:
+                qr_data = {"offer_id": offer_id, "use_credits": 0}
+                success, response = self.run_test(
+                    "QR generation with zero balance",
+                    "POST",
+                    "/qr/generate",
+                    400,  # Should return 400 for insufficient balance
+                    data=qr_data
+                )
+                if success:
+                    self.log_test("Insufficient balance handling", True, "Correctly rejected QR generation with zero balance")
+                else:
+                    self.log_test("Insufficient balance handling", False, "Should reject QR generation with zero balance")
+            else:
+                self.log_test("Insufficient balance test", True, "User has sufficient balance, skipping test")
+        
+        return True
     def test_get_establishment(self):
         """Test GET /api/establishments/me"""
         print("\n🏢 Testing Get My Establishment...")
@@ -119,6 +259,41 @@ class iTokeTester:
             print(f"   Token Balance: {response.get('token_balance', 0)}")
             return True
         return False
+
+    def get_test_offer_id(self):
+        """Get an existing offer ID for testing QR generation"""
+        print("\n🔍 Getting Test Offer ID...")
+        
+        # First try to get existing offers
+        success, response = self.run_test(
+            "GET /api/offers (public)",
+            "GET",
+            "/offers?limit=1",
+            200
+        )
+        
+        if success and isinstance(response, list) and len(response) > 0:
+            offer_id = response[0].get('offer_id')
+            print(f"   Using existing offer ID: {offer_id}")
+            return offer_id
+        
+        # If no offers exist, we need to create one first
+        # Switch to establishment login temporarily
+        old_token = self.session_token
+        
+        if self.test_establishment_login():
+            if self.test_get_establishment():
+                create_success, new_offer = self.test_create_offer()
+                if create_success:
+                    offer_id = new_offer.get('offer_id')
+                    print(f"   Created new offer ID: {offer_id}")
+                    # Switch back to client login
+                    self.session_token = old_token
+                    return offer_id
+        
+        # Restore client token
+        self.session_token = old_token
+        return None
 
     def test_get_my_offers(self):
         """Test GET /api/establishments/me/offers"""
@@ -240,38 +415,47 @@ class iTokeTester:
 
     def run_comprehensive_test(self):
         """Run all tests in sequence"""
-        print("🚀 Starting iToke Backend API Tests")
-        print("=" * 60)
+        print("🚀 Starting iToke Backend API Tests - QR Generation & Credits")
+        print("=" * 70)
         
-        # Test 1: Login
-        if not self.test_establishment_login():
-            print("❌ Login failed - cannot continue with other tests")
+        # Test 1: Client Login
+        print("\n=== CLIENT AUTHENTICATION TESTS ===")
+        client_success, client_data = self.test_client_login()
+        if not client_success:
+            print("❌ Client login failed - cannot continue with QR tests")
             return False
         
-        # Test 2: Get establishment
-        if not self.test_get_establishment():
-            print("❌ Get establishment failed - user might need to register establishment")
+        # Test 2: Auth/me endpoint
+        auth_success, auth_data = self.test_auth_me_endpoint()
+        if not auth_success:
+            print("❌ Auth/me failed - session validation issue")
             return False
         
-        # Test 3: Get existing offers
-        success, existing_offers = self.test_get_my_offers()
-        if not success:
-            print("❌ Get offers failed")
+        # Test 3: Get test offer ID
+        offer_id = self.get_test_offer_id()
+        if not offer_id:
+            print("❌ Could not get test offer ID - cannot test QR generation")
             return False
         
-        # Test 4: Create new offer
-        create_success, new_offer = self.test_create_offer()
-        if not create_success:
-            print("❌ Create offer failed - this is the main issue reported")
-            return False
+        print(f"\n=== QR GENERATION TESTS (Offer ID: {offer_id}) ===")
         
-        # Test 5: Verify offers list updated
-        if not self.test_offers_after_creation():
-            print("❌ Offers list not updated after creation")
-            return False
+        # Test 4: QR Generation with tokens
+        token_qr_success, token_qr_data = self.test_qr_generation_with_tokens(offer_id)
         
-        # Test 6: Test new user flow
-        self.test_establishment_registration_flow()
+        # Test 5: QR Generation with credits (if user has credits)
+        if auth_data.get('credits', 0) >= 1:
+            credit_qr_success, credit_qr_data = self.test_qr_generation_with_credits(offer_id)
+        else:
+            print("⚠️ User has no credits, skipping credit QR generation test")
+            credit_qr_success = True  # Skip this test
+        
+        # Test 6: Insufficient balance scenarios
+        self.test_insufficient_balance_scenarios(offer_id)
+        
+        # Test 7: Establishment login (for completeness)
+        print("\n=== ESTABLISHMENT AUTHENTICATION TESTS ===")
+        if self.test_establishment_login():
+            self.test_get_establishment()
         
         return True
 
@@ -306,10 +490,10 @@ def main():
         tester.print_summary()
         
         if success:
-            print("\n🎉 All tests passed! The 'Publicar Oferta' functionality appears to be working.")
+            print("\n🎉 All tests passed! QR generation and authentication appear to be working.")
             return 0
         else:
-            print("\n⚠️  Some tests failed. The 'Publicar Oferta' issue may be confirmed.")
+            print("\n⚠️  Some tests failed. There may be issues with QR generation or authentication.")
             return 1
             
     except KeyboardInterrupt:

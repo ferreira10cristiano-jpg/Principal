@@ -56,11 +56,11 @@ export default function OfferDetailScreen() {
     }
   };
 
-  const handleGenerateQR = async () => {
+  const handleGenerateQR = async (useCredits?: number) => {
     if (!offer) return;
     setIsGenerating(true);
     try {
-      const qr = await api.generateQR(offer.offer_id);
+      const qr = await api.generateQR(offer.offer_id, useCredits);
       setGeneratedQR(qr);
       await refreshUser();
     } catch (error: any) {
@@ -286,11 +286,16 @@ export default function OfferDetailScreen() {
           </View>
         )}
 
-        {/* Token Info */}
+        {/* Token/Credit Info */}
         <View style={styles.tokenInfoBar}>
-          <Ionicons name="ticket" size={18} color="#10B981" />
-          <Text style={styles.tokenInfoText}>Custo: 1 token para gerar QR Code</Text>
-          <Text style={styles.tokenBalance}>Saldo: {user?.tokens || 0}</Text>
+          <View style={styles.tokenInfoItem}>
+            <Ionicons name="ticket" size={18} color="#10B981" />
+            <Text style={styles.tokenInfoText}>Tokens: {user?.tokens || 0}</Text>
+          </View>
+          <View style={styles.tokenInfoItem}>
+            <Ionicons name="wallet" size={18} color="#3B82F6" />
+            <Text style={styles.creditInfoText}>Créditos: R$ {(user?.credits || 0).toFixed(2).replace('.', ',')}</Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -303,10 +308,6 @@ export default function OfferDetailScreen() {
         >
           <Ionicons name="qr-code" size={22} color="#0F172A" />
           <Text style={styles.generateButtonText}>Gerar QR Code</Text>
-          <View style={styles.tokenCost}>
-            <Ionicons name="ticket" size={14} color="#0F172A" />
-            <Text style={styles.tokenCostText}>1</Text>
-          </View>
         </TouchableOpacity>
       </View>
 
@@ -321,6 +322,7 @@ export default function OfferDetailScreen() {
         isGenerating={isGenerating}
         onGenerate={handleGenerateQR}
         userTokens={user?.tokens || 0}
+        userCredits={user?.credits || 0}
       />
     </View>
   );
@@ -574,19 +576,29 @@ const styles = StyleSheet.create({
   tokenInfoBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-around',
     marginHorizontal: 16,
     marginTop: 20,
     backgroundColor: '#1E293B',
     padding: 12,
     borderRadius: 10,
-    gap: 8,
     borderWidth: 1,
     borderColor: '#334155',
   },
+  tokenInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   tokenInfoText: {
-    fontSize: 13,
-    color: '#94A3B8',
-    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  creditInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
   },
   tokenBalance: {
     fontSize: 13,

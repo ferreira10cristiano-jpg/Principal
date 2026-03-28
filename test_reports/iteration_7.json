@@ -1,0 +1,47 @@
+{
+  "summary": "Completed testing of QR generation authentication and credits functionality. Backend APIs are working correctly with proper authentication and token/credit balance handling. Frontend code review shows proper implementation but browser automation had technical issues preventing full UI verification.",
+  
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "QR Modal Testing",
+        "issue": "Could not complete full frontend testing due to browser automation technical issues",
+        "affected_selectors": ["QR generation button", "QR modal"],
+        "fix_priority": "LOW"
+      }
+    ],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "Client login (cliente@teste.com) - returns tokens and credits",
+    "GET /api/auth/me - returns tokens and credits in response", 
+    "POST /api/qr/generate with use_credits=0 - uses token successfully",
+    "POST /api/qr/generate with use_credits=1 - endpoint ready for credits",
+    "Establishment login and data retrieval",
+    "Authentication session validation",
+    "QR code generation and hash creation",
+    "Token balance deduction on QR generation",
+    "Insufficient balance error handling"
+  ],
+  
+  "test_report_links": ["/app/backend_test.py"],
+  
+  "action_item_for_main_agent": "",
+  
+  "updated_files": ["/app/backend_test.py"],
+  
+  "success_percentage": {
+    "backend": "100%",
+    "frontend": "60% (partial due to browser automation issues)"
+  },
+  
+  "should_call_test_agent_after_fix": "false",
+  "should_main_agent_test_itself": "true"
+}

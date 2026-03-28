@@ -269,6 +269,7 @@ class QRCodeBase(BaseModel):
 
 class QRCodeGenerate(BaseModel):
     offer_id: str
+    use_credits: Optional[float] = 0  # Amount of credits to use (optional)
 
 class QRCodeValidate(BaseModel):
     code_hash: str
@@ -1054,16 +1055,30 @@ async def get_my_packages(user: dict = Depends(get_current_user)):
 @api_router.post("/qr/generate")
 async def generate_qr_code(data: QRCodeGenerate, user: dict = Depends(get_current_user)):
     """Generate QR code for offer redemption"""
-    # Check user tokens
+    # Get user tokens
     tokens = await db.client_tokens.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    token_balance = tokens.get("balance", 0) if tokens else 0
     
-    if not tokens or tokens.get("balance", 0) < 1:
-        raise HTTPException(status_code=400, detail="Insufficient tokens")
+    # Get user credits
+    credits = await db.client_credits.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    credit_balance = credits.get("balance", 0) if credits else 0
+    
+    # Check if user has at least 1 token OR enough credits
+    if token_balance < 1 and credit_balance < 1:
+        raise HTTPException(status_code=400, detail="Saldo insuficiente. Você precisa de pelo menos 1 token ou R$ 1,00 em créditos.")
     
     # Get offer
     offer = await db.offers.find_one({"offer_id": data.offer_id}, {"_id": 0})
     if not offer or not offer.get("active"):
         raise HTTPException(status_code=404, detail="Offer not found or inactive")
+    
+    # Calculate credits to use
+    credits_to_use = min(data.use_credits or 0, credit_balance)
+    
+    # If not using credits, deduct 1 token
+    if credits_to_use < 1:
+        if token_balance < 1:
+            raise HTTPException(status_code=400, detail="Tokens insuficientes. Use créditos ou compre um pacote.")
     
     # Generate unique code
     qr_id = f"qr_{uuid.uuid4().hex[:12]}"
@@ -1075,24 +1090,33 @@ async def generate_qr_code(data: QRCodeGenerate, user: dict = Depends(get_curren
     qr_code = {
         "qr_id": qr_id,
         "code_hash": code_hash,
-        "offer_code": offer_code,  # Include offer code for easy reference
+        "offer_code": offer_code,
         "generated_by_user_id": user["user_id"],
         "for_offer_id": data.offer_id,
         "establishment_id": offer["establishment_id"],
+        "credits_used_on_generation": credits_to_use,
         "used": False,
         "used_at": None,
         "validated_by_establishment_id": None,
         "created_at": datetime.now(timezone.utc),
-        "expires_at": datetime.now(timezone.utc) + timedelta(days=180)  # 6 months expiry
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=180)
     }
     
     await db.qr_codes.insert_one(qr_code)
     
-    # Deduct 1 token from user
-    await db.client_tokens.update_one(
-        {"user_id": user["user_id"]},
-        {"$inc": {"balance": -1}}
-    )
+    # Deduct payment
+    if credits_to_use >= 1:
+        # Use credits instead of token
+        await db.client_credits.update_one(
+            {"user_id": user["user_id"]},
+            {"$inc": {"balance": -credits_to_use}}
+        )
+    else:
+        # Deduct 1 token
+        await db.client_tokens.update_one(
+            {"user_id": user["user_id"]},
+            {"$inc": {"balance": -1}}
+        )
     
     # Increment QR generated count on offer
     await db.offers.update_one(
