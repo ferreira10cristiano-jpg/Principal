@@ -493,7 +493,7 @@ async def exchange_session(request: Request, response: Response):
         })
     
     # Create session
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=180)  # 6 months session
     await db.user_sessions.update_one(
         {"user_id": user_id},
         {"$set": {

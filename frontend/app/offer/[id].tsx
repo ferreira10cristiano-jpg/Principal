@@ -31,7 +31,7 @@ export default function OfferDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { user, refreshUser } = useAuthStore();
+  const { user, refreshUser, logout } = useAuthStore();
   const { width } = useWindowDimensions();
   const heroWidth = Math.min(width, 500);
   const heroHeight = heroWidth * 0.65;
@@ -65,7 +65,18 @@ export default function OfferDetailScreen() {
       await refreshUser();
     } catch (error: any) {
       console.error('Error generating QR:', error);
-      alert(error.message || 'Erro ao gerar QR Code');
+      const errorMsg = error.message || 'Erro ao gerar QR Code';
+      
+      // Check if session expired
+      if (errorMsg.includes('Sessão expirada') || errorMsg.includes('Invalid session')) {
+        alert('Sua sessão expirou. Por favor, faça login novamente.');
+        // Logout and redirect
+        await logout();
+        router.replace('/');
+        return;
+      }
+      
+      alert(errorMsg);
     } finally {
       setIsGenerating(false);
     }

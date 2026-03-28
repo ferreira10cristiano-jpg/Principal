@@ -54,6 +54,20 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      
+      // Handle session expired/invalid - clear token and redirect to login
+      if (response.status === 401) {
+        this.sessionToken = null;
+        try {
+          await AsyncStorage.removeItem('session_token');
+          await AsyncStorage.removeItem('user');
+        } catch (e) {
+          console.error('Error clearing storage:', e);
+        }
+        // The error will propagate and the UI should handle redirect to login
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
       throw new Error(error.detail || 'Request failed');
     }
 
