@@ -53,7 +53,7 @@ export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'withdrawals' | 'users'>('overview');
 
   // Real data state
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -69,6 +69,15 @@ export default function AdminDashboard() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState('');
 
+  // Withdrawals state
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  // Users state
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -105,15 +114,39 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchWithdrawals = useCallback(async () => {
+    try {
+      setWithdrawalsLoading(true);
+      const data = await api.getAdminWithdrawals();
+      setWithdrawals(data);
+    } catch (err: any) {
+      console.error('Error fetching withdrawals:', err);
+    } finally {
+      setWithdrawalsLoading(false);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setUsersLoading(true);
+      const data = await api.getAdminUsers();
+      setUsersList(data);
+    } catch (err: any) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
   useEffect(() => {
-    if (activeTab === 'financial') {
-      fetchFinancial();
-    }
-  }, [activeTab, fetchFinancial]);
+    if (activeTab === 'financial') fetchFinancial();
+    if (activeTab === 'withdrawals') fetchWithdrawals();
+    if (activeTab === 'users') fetchUsers();
+  }, [activeTab, fetchFinancial, fetchWithdrawals, fetchUsers]);
 
   const handleSaveCommission = async () => {
     const val = parseFloat(commissionInput.replace(',', '.'));
@@ -132,6 +165,39 @@ export default function AdminDashboard() {
       setSettingsMsg(err.message || 'Erro ao salvar');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleApproveWithdrawal = async (estId: string, amount: number) => {
+    if (typeof window !== 'undefined') {
+      if (!window.confirm(`Aprovar saque de R$ ${amount.toFixed(2).replace('.', ',')}?`)) return;
+    }
+    setApprovingId(estId);
+    try {
+      await api.approveWithdrawal(estId, amount);
+      fetchWithdrawals();
+    } catch (err: any) {
+      if (typeof window !== 'undefined') window.alert(err.message || 'Erro ao aprovar saque');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleToggleBlock = async (userId: string, currentBlocked: boolean) => {
+    const action = currentBlocked ? 'desbloquear' : 'bloquear';
+    if (typeof window !== 'undefined') {
+      if (!window.confirm(`Deseja ${action} este usuario?`)) return;
+    }
+    setTogglingUserId(userId);
+    try {
+      await api.toggleBlockUser(userId, !currentBlocked);
+      setUsersList(prev => prev.map(u =>
+        u.user_id === userId ? { ...u, blocked: !currentBlocked } : u
+      ));
+    } catch (err: any) {
+      if (typeof window !== 'undefined') window.alert(err.message || 'Erro');
+    } finally {
+      setTogglingUserId(null);
     }
   };
 
@@ -270,7 +336,7 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
-          {(['overview', 'financial', 'users'] as const).map((tab) => (
+          {(['overview', 'financial', 'withdrawals', 'users'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -278,7 +344,7 @@ export default function AdminDashboard() {
               data-testid={`admin-tab-${tab}`}
             >
               <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'overview' ? 'Visao Geral' : tab === 'financial' ? 'Financeiro' : 'Usuarios'}
+                {tab === 'overview' ? 'Geral' : tab === 'financial' ? 'Financeiro' : tab === 'withdrawals' ? 'Saques' : 'Usuarios'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -516,38 +582,142 @@ export default function AdminDashboard() {
           </View>
         )}
 
-        {activeTab === 'users' && stats && (
+        {activeTab === 'withdrawals' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Gestao de Usuarios</Text>
-            <View style={styles.userStatsGrid}>
-              <View style={[styles.userStatCard, { borderColor: '#3B82F6' }]}>
-                <Ionicons name="person" size={28} color="#3B82F6" />
-                <Text style={styles.userStatValue}>
-                  {Math.max(0, stats.total_users - stats.total_establishments)}
-                </Text>
-                <Text style={styles.userStatLabel}>Clientes</Text>
+            <Text style={styles.sectionTitle}>Solicitacoes de Saque</Text>
+            {withdrawalsLoading ? (
+              <View style={styles.financialLoading}>
+                <ActivityIndicator size="large" color="#3B82F6" />
               </View>
-              <View style={[styles.userStatCard, { borderColor: '#10B981' }]}>
-                <Ionicons name="business" size={28} color="#10B981" />
-                <Text style={styles.userStatValue}>{stats.total_establishments}</Text>
-                <Text style={styles.userStatLabel}>Estabelecimentos</Text>
+            ) : withdrawals.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="checkmark-circle" size={32} color="#10B981" />
+                <Text style={styles.emptyText}>Nenhum saque pendente</Text>
               </View>
-            </View>
-            <TouchableOpacity style={styles.adminActionCard}>
-              <Ionicons name="person-add" size={22} color="#3B82F6" />
-              <Text style={styles.adminActionText}>Gerenciar Usuarios</Text>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adminActionCard}>
-              <Ionicons name="shield-checkmark" size={22} color="#8B5CF6" />
-              <Text style={styles.adminActionText}>Permissoes e Roles</Text>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.adminActionCard}>
-              <Ionicons name="analytics" size={22} color="#10B981" />
-              <Text style={styles.adminActionText}>Relatorios Completos</Text>
-              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-            </TouchableOpacity>
+            ) : (
+              withdrawals.map((wd) => (
+                <View key={wd.establishment_id} style={styles.withdrawalCard} data-testid={`withdrawal-${wd.establishment_id}`}>
+                  <View style={styles.withdrawalTop}>
+                    <View style={styles.withdrawalInfo}>
+                      <Text style={styles.withdrawalName}>{wd.name}</Text>
+                      {wd.city ? <Text style={styles.withdrawalCity}>{wd.city}</Text> : null}
+                    </View>
+                    <View style={styles.withdrawalAmountWrap}>
+                      <Text style={styles.withdrawalAmount}>
+                        R$ {(wd.withdrawable_balance || 0).toFixed(2).replace('.', ',')}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.withdrawalMeta}>
+                    <View style={styles.withdrawalPixRow}>
+                      <Ionicons name="key" size={14} color="#64748B" />
+                      <Text style={styles.withdrawalPixLabel}>Chave PIX:</Text>
+                      <Text style={styles.withdrawalPixValue}>
+                        {wd.pix_key || 'Nao cadastrada'}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.approveBtn, approvingId === wd.establishment_id && styles.approveBtnDisabled]}
+                    onPress={() => handleApproveWithdrawal(wd.establishment_id, wd.withdrawable_balance)}
+                    disabled={approvingId === wd.establishment_id}
+                    data-testid={`approve-withdrawal-${wd.establishment_id}`}
+                  >
+                    {approvingId === wd.establishment_id ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={18} color="#FFF" />
+                        <Text style={styles.approveBtnText}>Aprovar Saque</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {activeTab === 'users' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Listagem de Usuarios</Text>
+            {usersLoading ? (
+              <View style={styles.financialLoading}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+              </View>
+            ) : usersList.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="people-outline" size={32} color="#CBD5E1" />
+                <Text style={styles.emptyText}>Nenhum usuario encontrado</Text>
+              </View>
+            ) : (
+              <>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Nome</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2 }]}>E-mail</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Tipo</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Acao</Text>
+                </View>
+                {/* Table Rows */}
+                {usersList.map((u) => (
+                  <View key={u.user_id} style={styles.tableRow} data-testid={`user-row-${u.user_id}`}>
+                    <Text style={[styles.tableCell, { flex: 2, fontWeight: '600' }]} numberOfLines={1}>
+                      {u.name || '—'}
+                    </Text>
+                    <Text style={[styles.tableCell, { flex: 2, color: '#64748B' }]} numberOfLines={1}>
+                      {u.email}
+                    </Text>
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                      <View style={[
+                        styles.roleBadge,
+                        u.role === 'establishment' ? styles.roleBadgeEst :
+                        u.role === 'admin' ? styles.roleBadgeAdmin : styles.roleBadgeClient
+                      ]}>
+                        <Text style={[
+                          styles.roleBadgeText,
+                          u.role === 'establishment' ? { color: '#10B981' } :
+                          u.role === 'admin' ? { color: '#8B5CF6' } : { color: '#3B82F6' }
+                        ]}>
+                          {u.role === 'establishment' ? 'Estab.' : u.role === 'admin' ? 'Admin' : 'Cliente'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                      <View style={[styles.statusBadge, u.blocked ? styles.statusBlocked : styles.statusActive]}>
+                        <View style={[styles.statusDot, { backgroundColor: u.blocked ? '#EF4444' : '#10B981' }]} />
+                        <Text style={[styles.statusText, { color: u.blocked ? '#EF4444' : '#10B981' }]}>
+                          {u.blocked ? 'Inativo' : 'Ativo'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                      {u.role !== 'admin' ? (
+                        <TouchableOpacity
+                          style={[styles.blockBtn, u.blocked ? styles.unblockBtn : {}]}
+                          onPress={() => handleToggleBlock(u.user_id, u.blocked)}
+                          disabled={togglingUserId === u.user_id}
+                          data-testid={`block-user-${u.user_id}`}
+                        >
+                          {togglingUserId === u.user_id ? (
+                            <ActivityIndicator size="small" color={u.blocked ? '#10B981' : '#EF4444'} />
+                          ) : (
+                            <Ionicons
+                              name={u.blocked ? 'lock-open' : 'lock-closed'}
+                              size={15}
+                              color={u.blocked ? '#10B981' : '#EF4444'}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ) : (
+                        <Ionicons name="shield" size={16} color="#8B5CF6" />
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
           </View>
         )}
 
@@ -917,11 +1087,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
   // Commissions
-  commissionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   ruleCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
@@ -962,59 +1127,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 3,
     fontStyle: 'italic',
-  },
-  // Users tab
-  userStatsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  userStatCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  userStatValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 8,
-  },
-  userStatLabel: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  adminActionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  adminActionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
   },
   // Modal
   modalOverlay: {
@@ -1314,5 +1426,163 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
     marginTop: 6,
+  },
+  // Withdrawal styles
+  withdrawalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  withdrawalTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  withdrawalInfo: {
+    flex: 1,
+  },
+  withdrawalName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  withdrawalCity: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  withdrawalAmountWrap: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  withdrawalAmount: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  withdrawalMeta: {
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  withdrawalPixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  withdrawalPixLabel: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  withdrawalPixValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  approveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 11,
+    borderRadius: 10,
+    gap: 6,
+  },
+  approveBtnDisabled: {
+    opacity: 0.6,
+  },
+  approveBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // Users table styles
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  tableHeaderCell: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  tableCell: {
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  roleBadgeClient: {
+    backgroundColor: '#EFF6FF',
+  },
+  roleBadgeEst: {
+    backgroundColor: '#ECFDF5',
+  },
+  roleBadgeAdmin: {
+    backgroundColor: '#F5F3FF',
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  statusActive: {},
+  statusBlocked: {},
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  blockBtn: {
+    padding: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+  },
+  unblockBtn: {
+    borderColor: '#D1FAE5',
+    backgroundColor: '#ECFDF5',
   },
 });

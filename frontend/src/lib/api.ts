@@ -326,6 +326,28 @@ class ApiClient {
     });
   }
 
+  async getAdminWithdrawals() {
+    return this.request<any[]>('/admin/withdrawals');
+  }
+
+  async approveWithdrawal(establishmentId: string, amount: number) {
+    return this.request<any>('/admin/withdrawals/approve', {
+      method: 'POST',
+      body: JSON.stringify({ establishment_id: establishmentId, amount }),
+    });
+  }
+
+  async getAdminUsers() {
+    return this.request<any[]>('/admin/users');
+  }
+
+  async toggleBlockUser(userId: string, blocked: boolean) {
+    return this.request<any>(`/admin/users/${userId}/block`, {
+      method: 'PUT',
+      body: JSON.stringify({ blocked }),
+    });
+  }
+
   // Seed
   async seedData(force?: boolean) {
     const query = force ? '?force=true' : '';

@@ -1,0 +1,143 @@
+{
+  "summary": "Iteration 16: Admin Upgrade Part 3 - Saques (Withdrawals) and Usuarios (Users) tabs testing completed. All 16 backend tests passed (100%). Frontend verified via Playwright: Saques tab shows establishments with balance, PIX key, and Aprovar Saque button. Usuarios tab shows table with Nome, E-mail, Tipo (badges), Status (Ativo/Inativo), Acao (block/unblock). Admin users show shield icon instead of block button. All 4 tabs render correctly: Geral | Financeiro | Saques | Usuarios.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Saques tab",
+        "issues": ["PIX key shows 'Nao cadastrada' for all establishments - establishments may need to register PIX keys"]
+      }
+    ]
+  },
+  "passed_tests": [
+    "Health check endpoint",
+    "GET /api/admin/withdrawals returns list of establishments with balance > 0",
+    "GET /api/admin/withdrawals rejects non-admin users with 403",
+    "GET /api/admin/withdrawals rejects unauthenticated requests with 401",
+    "POST /api/admin/withdrawals/approve deducts balance and creates records",
+    "POST /api/admin/withdrawals/approve rejects amount > balance",
+    "POST /api/admin/withdrawals/approve rejects non-admin users",
+    "POST /api/admin/withdrawals/approve rejects invalid establishment",
+    "POST /api/admin/withdrawals/approve rejects zero amount",
+    "GET /api/admin/users returns all users with required fields",
+    "GET /api/admin/users rejects non-admin users with 403",
+    "GET /api/admin/users rejects unauthenticated requests with 401",
+    "PUT /api/admin/users/{user_id}/block toggles blocked status",
+    "PUT /api/admin/users/{user_id}/block cannot block admin users",
+    "PUT /api/admin/users/{user_id}/block rejects non-admin users",
+    "PUT /api/admin/users/{user_id}/block returns 404 for non-existent user"
+  ],
+  "verified_features": [
+    {
+      "feature": "All 4 admin tabs render: Geral | Financeiro | Saques | Usuarios",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows all 4 tabs with correct labels"
+    },
+    {
+      "feature": "Saques tab shows establishments with withdrawable_balance > 0",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows 2 establishments: Restaurante Teste Simulação (R$21.50) and OFICINA DA FOME 2 (R$27.00)"
+    },
+    {
+      "feature": "Saques tab shows establishment name, PIX key, and balance",
+      "status": "VERIFIED",
+      "verification": "Each card shows business_name, Chave PIX field, and R$ amount"
+    },
+    {
+      "feature": "Saques tab has Aprovar Saque button",
+      "status": "VERIFIED",
+      "verification": "Green 'Aprovar Saque' button visible for each establishment"
+    },
+    {
+      "feature": "Usuarios tab shows table with Nome, E-mail, Tipo, Status, Acao columns",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows table header with all 5 columns"
+    },
+    {
+      "feature": "Usuarios tab shows role badges (Cliente, Estab., Admin)",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows colored badges: Admin (purple), Cliente (blue), Estab. (green)"
+    },
+    {
+      "feature": "Usuarios tab shows status badges (Ativo/Inativo)",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows green dot with 'Ativo' text for active users"
+    },
+    {
+      "feature": "Admin users show shield icon instead of block button",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows purple shield icon for Admin and Admin iToke rows"
+    },
+    {
+      "feature": "Non-admin users show block/unblock button",
+      "status": "VERIFIED",
+      "verification": "Screenshot shows red lock icon for Cliente and Estab. users"
+    },
+    {
+      "feature": "POST /api/admin/withdrawals/approve creates withdrawal record and audit log",
+      "status": "VERIFIED",
+      "verification": "Backend test confirmed withdrawal_id returned and balance deducted"
+    }
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_admin_withdrawals_users_iter16.py",
+    "/app/test_reports/pytest/pytest_results_iter16.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "GET /api/admin/withdrawals correctly filters establishments with withdrawable_balance > 0",
+    "POST /api/admin/withdrawals/approve properly validates amount <= balance before deducting",
+    "Withdrawal approval creates record in withdrawal_requests collection with status='paid'",
+    "Audit log created in financial_logs collection with type='withdrawal_approved'",
+    "GET /api/admin/users returns all users with user_id, name, email, role, blocked fields",
+    "PUT /api/admin/users/{user_id}/block correctly refuses to block admin users with 400 error",
+    "All admin endpoints properly check user.role == 'admin' and return 403 for non-admin users"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_withdrawals_users_iter16.py"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 tests passed)",
+    "frontend": "100% - All visual verifications passed"
+  },
+  "test_credentials": {
+    "admin": {
+      "email": "admin@itoke.master",
+      "name": "Admin iToke",
+      "role": "admin",
+      "access_key": "admin123"
+    },
+    "client": {
+      "email": "cliente@teste.com",
+      "name": "Cliente Teste",
+      "role": "client"
+    }
+  },
+  "seed_data_creation": "None - used existing data in MongoDB",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin Upgrade Part 3 complete. Saques tab lists establishments with withdrawable_balance > 0 from MongoDB. Approving withdrawal deducts balance, creates withdrawal_requests record, and creates financial_logs audit entry. Usuarios tab lists all users with role badges and block/unblock functionality. Admin users cannot be blocked (shows shield icon). Two establishments currently have balance: Restaurante Teste Simulação (R$21.50) and OFICINA DA FOME 2 (R$27.00). 16 users total including 2 admins.",
+  "establishments_with_balance": [
+    {
+      "name": "Restaurante Teste Simulação",
+      "balance": 21.50,
+      "pix_key": "Not registered"
+    },
+    {
+      "name": "OFICINA DA FOME 2",
+      "balance": 27.00,
+      "pix_key": "Not registered"
+    }
+  ],
+  "users_summary": {
+    "total": 16,
+    "admins": 2,
+    "clients": "Multiple",
+    "establishments": "Multiple"
+  }
+}

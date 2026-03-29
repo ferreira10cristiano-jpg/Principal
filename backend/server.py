@@ -1933,6 +1933,155 @@ async def update_admin_settings(data: dict, user: dict = Depends(get_current_use
     
     return {"message": "Configuracoes atualizadas", "commission_percent": commission}
 
+@api_router.get("/admin/withdrawals")
+async def get_pending_withdrawals(user: dict = Depends(get_current_user)):
+    """List establishments with withdrawable_balance > 0"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    establishments = await db.establishments.find(
+        {"withdrawable_balance": {"$gt": 0}},
+        {"_id": 0, "establishment_id": 1, "business_name": 1, "name": 1,
+         "withdrawable_balance": 1, "pix_key": 1, "user_id": 1, "city": 1}
+    ).to_list(100)
+    
+    result = []
+    for est in establishments:
+        est_name = est.get("business_name") or est.get("name") or "Sem nome"
+        result.append({
+            "establishment_id": est["establishment_id"],
+            "name": est_name,
+            "city": est.get("city", ""),
+            "pix_key": est.get("pix_key"),
+            "withdrawable_balance": est.get("withdrawable_balance", 0),
+            "user_id": est.get("user_id"),
+        })
+    
+    return result
+
+@api_router.post("/admin/withdrawals/approve")
+async def approve_withdrawal(data: dict, user: dict = Depends(get_current_user)):
+    """Approve a withdrawal: deduct balance, log audit"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    est_id = data.get("establishment_id")
+    amount = data.get("amount")
+    
+    if not est_id or amount is None:
+        raise HTTPException(status_code=400, detail="establishment_id e amount obrigatorios")
+    
+    amount = float(amount)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Valor deve ser maior que zero")
+    
+    establishment = await db.establishments.find_one(
+        {"establishment_id": est_id},
+        {"_id": 0}
+    )
+    if not establishment:
+        raise HTTPException(status_code=404, detail="Estabelecimento nao encontrado")
+    
+    current_balance = establishment.get("withdrawable_balance", 0)
+    if amount > current_balance:
+        raise HTTPException(status_code=400, detail="Valor maior que saldo disponivel")
+    
+    now = datetime.now(timezone.utc)
+    
+    # Deduct balance
+    await db.establishments.update_one(
+        {"establishment_id": est_id},
+        {"$inc": {"withdrawable_balance": -amount}}
+    )
+    
+    # Create withdrawal record
+    withdrawal_id = f"wd_{uuid.uuid4().hex[:12]}"
+    withdrawal = {
+        "withdrawal_id": withdrawal_id,
+        "establishment_id": est_id,
+        "establishment_name": establishment.get("business_name") or establishment.get("name", ""),
+        "amount": amount,
+        "pix_key": establishment.get("pix_key"),
+        "status": "paid",
+        "approved_by": user["user_id"],
+        "approved_at": now,
+        "created_at": now,
+    }
+    await db.withdrawal_requests.insert_one(withdrawal)
+    withdrawal.pop("_id", None)
+    
+    # Audit log
+    audit = {
+        "log_id": f"audit_{uuid.uuid4().hex[:12]}",
+        "type": "withdrawal_approved",
+        "establishment_id": est_id,
+        "amount": amount,
+        "approved_by_admin": user["user_id"],
+        "withdrawal_id": withdrawal_id,
+        "created_at": now,
+    }
+    await db.financial_logs.insert_one(audit)
+    
+    return {
+        "message": "Saque aprovado com sucesso",
+        "withdrawal_id": withdrawal_id,
+        "amount": amount,
+        "new_balance": current_balance - amount,
+    }
+
+@api_router.get("/admin/users")
+async def get_admin_users(user: dict = Depends(get_current_user)):
+    """List all users for admin management"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    users = await db.users.find(
+        {},
+        {"_id": 0, "user_id": 1, "name": 1, "email": 1, "role": 1,
+         "blocked": 1, "created_at": 1}
+    ).sort("created_at", -1).to_list(500)
+    
+    result = []
+    for u in users:
+        result.append({
+            "user_id": u["user_id"],
+            "name": u.get("name", ""),
+            "email": u.get("email", ""),
+            "role": u.get("role", "client"),
+            "blocked": u.get("blocked", False) or False,
+            "created_at": u.get("created_at"),
+        })
+    
+    return result
+
+@api_router.put("/admin/users/{user_id}/block")
+async def toggle_block_user(user_id: str, data: dict, user: dict = Depends(get_current_user)):
+    """Block or unblock a user"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    blocked = data.get("blocked")
+    if blocked is None:
+        raise HTTPException(status_code=400, detail="Campo 'blocked' obrigatorio")
+    
+    target = await db.users.find_one({"user_id": user_id}, {"_id": 0, "user_id": 1, "role": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+    
+    if target.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="Nao e possivel bloquear um admin")
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"blocked": bool(blocked)}}
+    )
+    
+    return {
+        "message": f"Usuario {'bloqueado' if blocked else 'desbloqueado'}",
+        "user_id": user_id,
+        "blocked": bool(blocked),
+    }
+
 # ===================== EMAIL LOGIN (BYPASS FOR TESTING) =====================
 
 class EmailLoginRequest(BaseModel):
