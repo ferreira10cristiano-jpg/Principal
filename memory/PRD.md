@@ -17,16 +17,17 @@ Plataforma de fidelidade e ofertas para estabelecimentos e clientes. Estabelecim
   - `GET /api/establishments/me/sales-history` - Historico de vendas
 
 ### Frontend (Expo React Native Web)
-- **QRModal**: Input de creditos com botao MAX integrado, auto-fill, calculo em tempo real
+- **QRModal**: displayMode state (generate/loading/result) com transicao segura via setTimeout
 - **QR Fullscreen**: Valor Original (riscado), Creditos Aplicados (vermelho), Valor Final (verde)
 - **Meus QR**: Cards com breakdown de preco, backup code, botao cancelar
-- **Validate (Estabelecimento)**: Fluxo 2 etapas (scan → preview → confirmar recebimento)
+- **Validate (Estabelecimento)**: html5-qrcode para scanner web + input manual + 2 etapas
 
 ## Implementation Log
 - **25-28/03/2026**: MVP completo com ofertas, QR codes, validacao
 - **28/03/2026**: CRITICAL REFACTOR - Vouchers persistidos, backup codes, camera scanner
 - **28/03/2026**: URGENT REFACTOR - Deducao imediata de creditos, cancelamento com devolucao
-- **28/03/2026**: FINAL POLISH - MAX button fix, QR enriquecido, validacao 2 etapas, input sanitization
+- **28/03/2026**: FINAL POLISH - MAX button fix, QR enriquecido, validacao 2 etapas
+- **29/03/2026**: CRITICAL FIX - removeChild DOM crash fix (displayMode state), html5-qrcode scanner
 
 ## Core Requirements (Implementados)
 - [x] Modo Simulacao para ofertas
@@ -36,11 +37,11 @@ Plataforma de fidelidade e ofertas para estabelecimentos e clientes. Estabelecim
 - [x] Fluxo completo de creditos (deducao, transferencia, devolucao)
 - [x] Vouchers persistidos com credits_used, final_price_to_pay, original_price
 - [x] Validacao 2 etapas (preview + confirmar recebimento)
-- [x] QR Modal com MAX button integrado, auto-fill, calculo real-time
-- [x] QR Fullscreen enriquecido (Valor Original, Creditos, Valor Final)
+- [x] QR Modal estavel (displayMode state sem removeChild crash)
+- [x] MAX button integrado com auto-fill e calculo real-time
+- [x] QR Fullscreen enriquecido
+- [x] html5-qrcode scanner para web
 - [x] Cancelamento com devolucao de creditos
-- [x] Camera scanner com scan frame e throttle
-- [x] Input sanitization (apenas numeros/decimais)
 - [x] Financial logs com status "totalmente_pago"
 - [x] Sem falsos erros em creditos parciais
 
@@ -52,5 +53,5 @@ Plataforma de fidelidade e ofertas para estabelecimentos e clientes. Estabelecim
 ### P2
 - [ ] Restaurar Google OAuth
 - [ ] Filtro de ofertas por cidade/bairro
-- [ ] Refatorar server.py em APIRouters
+- [ ] Refatorar server.py em APIRouters (>2300 linhas)
 - [ ] Historico completo de transacoes do cliente
