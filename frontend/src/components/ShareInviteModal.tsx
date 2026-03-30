@@ -58,12 +58,14 @@ export const ShareInviteModal: React.FC<ShareInviteModalProps> = ({
   })();
 
   const getMessage = () => {
+    const name = recipientName.trim();
     if (isFriend) {
-      return `Olá! Olha que aplicativo fantástico onde você ganha descontos e pode até sair de graça sua compra, é só ajudar a divulgar e ganhar bônus. Veja como funciona aqui: ${appLink}`;
+      const greeting = name ? `Olá, ${name}!` : 'Olá!';
+      return `${greeting} Olha que aplicativo fantástico onde você ganha descontos e pode até sair de graça sua compra, é só ajudar a divulgar e ganhar bônus. Veja como funciona aqui: ${appLink}`;
     } else {
-      const name = recipientName.trim() || 'Responsável';
+      const estName = name || 'Responsável';
       const senderName = userName || 'Um amigo';
-      return `Olá, ${name}! O ${senderName} indicou o iToke para o seu estabelecimento. Aumente suas vendas com nosso sistema de tokens e fidelidade! Veja como funciona aqui: ${appLink}`;
+      return `Olá, ${estName}! O ${senderName} indicou o iToke para o seu estabelecimento. Aumente suas vendas com nosso sistema de tokens e fidelidade! Veja como funciona aqui: ${appLink}`;
     }
   };
 
