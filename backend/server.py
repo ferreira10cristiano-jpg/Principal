@@ -1589,6 +1589,62 @@ async def get_my_network(user: dict = Depends(get_current_user)):
     level2_users = await get_referral_details(level2)
     level3_users = await get_referral_details(level3)
     
+    # Count active users per level (those who made at least 1 purchase)
+    async def count_active(users_list):
+        active = 0
+        for u in users_list:
+            has_purchase = await db.token_purchases.find_one(
+                {"user_id": u["user_id"], "status": "completed"}
+            )
+            if has_purchase:
+                active += 1
+        return active
+    
+    level1_active = await count_active(level1_users)
+    level2_active = await count_active(level2_users)
+    level3_active = await count_active(level3_users)
+    
+    # Credits earned per level from commissions
+    async def credits_by_level(level_num):
+        pipeline = [
+            {"$match": {
+                "to_user_id": user["user_id"],
+                "type": "purchase_commission",
+                "level": level_num,
+            }},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]
+        result = await db.transactions.aggregate(pipeline).to_list(1)
+        return result[0]["total"] if result else 0
+    
+    l1_credits = await credits_by_level(1)
+    l2_credits = await credits_by_level(2)
+    l3_credits = await credits_by_level(3)
+    
+    # Establishment referrals
+    est_referrals = await db.establishment_referrals.find(
+        {"referrer_user_id": user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    est_active = 0
+    for er in est_referrals:
+        est = await db.establishments.find_one(
+            {"establishment_id": er.get("establishment_id")},
+            {"_id": 0, "total_sales": 1}
+        )
+        if est and est.get("total_sales", 0) > 0:
+            est_active += 1
+    
+    est_credits_pipeline = [
+        {"$match": {
+            "to_user_id": user["user_id"],
+            "type": "establishment_referral",
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+    ]
+    est_credits_result = await db.transactions.aggregate(est_credits_pipeline).to_list(1)
+    est_credits = est_credits_result[0]["total"] if est_credits_result else 0
+    
     # Get transactions (commissions earned)
     transactions = await db.transactions.find(
         {"to_user_id": user["user_id"]},
@@ -1604,8 +1660,14 @@ async def get_my_network(user: dict = Depends(get_current_user)):
             "level2": level2_users,
             "level3": level3_users
         },
+        "network_stats": {
+            "level1": {"total": len(level1_users), "active": level1_active, "credits": l1_credits},
+            "level2": {"total": len(level2_users), "active": level2_active, "credits": l2_credits},
+            "level3": {"total": len(level3_users), "active": level3_active, "credits": l3_credits},
+            "establishments": {"total": len(est_referrals), "active": est_active, "credits": est_credits},
+        },
         "total_referrals": len(level1_users) + len(level2_users) + len(level3_users),
-        "transactions": transactions[:20],  # Last 20 transactions
+        "transactions": transactions[:20],
         "total_earned": total_earned
     }
 
@@ -2082,7 +2144,66 @@ async def toggle_block_user(user_id: str, data: dict, user: dict = Depends(get_c
         "blocked": bool(blocked),
     }
 
-# ===================== EMAIL LOGIN (BYPASS FOR TESTING) =====================
+# ===================== MEDIA MANAGEMENT =====================
+
+@api_router.get("/media")
+async def get_public_media():
+    """Get all media assets for clients to view/download"""
+    media = await db.media_assets.find(
+        {"active": True},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return media
+
+@api_router.get("/admin/media")
+async def get_admin_media(user: dict = Depends(get_current_user)):
+    """Get all media assets for admin management"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    media = await db.media_assets.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return media
+
+@api_router.post("/admin/media")
+async def add_media(data: dict, user: dict = Depends(get_current_user)):
+    """Add a new media asset (URL-based)"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    url = data.get("url", "").strip()
+    title = data.get("title", "").strip()
+    media_type = data.get("type", "image")  # image or video
+    
+    if not url:
+        raise HTTPException(status_code=400, detail="URL obrigatoria")
+    
+    media_id = f"media_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc)
+    
+    asset = {
+        "media_id": media_id,
+        "url": url,
+        "title": title or "Midia iToke",
+        "type": media_type,
+        "active": True,
+        "created_by": user["user_id"],
+        "created_at": now,
+    }
+    await db.media_assets.insert_one(asset)
+    asset.pop("_id", None)
+    
+    return asset
+
+@api_router.delete("/admin/media/{media_id}")
+async def delete_media(media_id: str, user: dict = Depends(get_current_user)):
+    """Delete a media asset"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.media_assets.delete_one({"media_id": media_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Midia nao encontrada")
+    
+    return {"message": "Midia removida", "media_id": media_id}
 
 class EmailLoginRequest(BaseModel):
     email: str

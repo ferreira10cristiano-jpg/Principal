@@ -348,6 +348,28 @@ class ApiClient {
     });
   }
 
+  // Media
+  async getPublicMedia() {
+    return this.request<any[]>('/media');
+  }
+
+  async getAdminMedia() {
+    return this.request<any[]>('/admin/media');
+  }
+
+  async addMedia(url: string, title: string, type: string) {
+    return this.request<any>('/admin/media', {
+      method: 'POST',
+      body: JSON.stringify({ url, title, type }),
+    });
+  }
+
+  async deleteMedia(mediaId: string) {
+    return this.request<any>(`/admin/media/${mediaId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Seed
   async seedData(force?: boolean) {
     const query = force ? '?force=true' : '';

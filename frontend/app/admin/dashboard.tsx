@@ -53,7 +53,7 @@ export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'withdrawals' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'withdrawals' | 'users' | 'media'>('overview');
 
   // Real data state
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -78,6 +78,15 @@ export default function AdminDashboard() {
   const [usersList, setUsersList] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
+  // Media state
+  const [mediaList, setMediaList] = useState<any[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [newMediaUrl, setNewMediaUrl] = useState('');
+  const [newMediaTitle, setNewMediaTitle] = useState('');
+  const [newMediaType, setNewMediaType] = useState<'image' | 'video'>('image');
+  const [addingMedia, setAddingMedia] = useState(false);
+  const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -138,6 +147,18 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchMedia = useCallback(async () => {
+    try {
+      setMediaLoading(true);
+      const data = await api.getAdminMedia();
+      setMediaList(data);
+    } catch (err: any) {
+      console.error('Error fetching media:', err);
+    } finally {
+      setMediaLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -146,7 +167,8 @@ export default function AdminDashboard() {
     if (activeTab === 'financial') fetchFinancial();
     if (activeTab === 'withdrawals') fetchWithdrawals();
     if (activeTab === 'users') fetchUsers();
-  }, [activeTab, fetchFinancial, fetchWithdrawals, fetchUsers]);
+    if (activeTab === 'media') fetchMedia();
+  }, [activeTab, fetchFinancial, fetchWithdrawals, fetchUsers, fetchMedia]);
 
   const handleSaveCommission = async () => {
     const val = parseFloat(commissionInput.replace(',', '.'));
@@ -198,6 +220,36 @@ export default function AdminDashboard() {
       if (typeof window !== 'undefined') window.alert(err.message || 'Erro');
     } finally {
       setTogglingUserId(null);
+    }
+  };
+
+  const handleAddMedia = async () => {
+    if (!newMediaUrl.trim()) return;
+    setAddingMedia(true);
+    try {
+      await api.addMedia(newMediaUrl.trim(), newMediaTitle.trim(), newMediaType);
+      setNewMediaUrl('');
+      setNewMediaTitle('');
+      fetchMedia();
+    } catch (err: any) {
+      if (typeof window !== 'undefined') window.alert(err.message || 'Erro ao adicionar midia');
+    } finally {
+      setAddingMedia(false);
+    }
+  };
+
+  const handleDeleteMedia = async (mediaId: string) => {
+    if (typeof window !== 'undefined') {
+      if (!window.confirm('Remover esta midia?')) return;
+    }
+    setDeletingMediaId(mediaId);
+    try {
+      await api.deleteMedia(mediaId);
+      setMediaList(prev => prev.filter(m => m.media_id !== mediaId));
+    } catch (err: any) {
+      if (typeof window !== 'undefined') window.alert(err.message || 'Erro');
+    } finally {
+      setDeletingMediaId(null);
     }
   };
 
@@ -336,7 +388,7 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
-          {(['overview', 'financial', 'withdrawals', 'users'] as const).map((tab) => (
+          {(['overview', 'financial', 'withdrawals', 'users', 'media'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -344,7 +396,7 @@ export default function AdminDashboard() {
               data-testid={`admin-tab-${tab}`}
             >
               <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'overview' ? 'Geral' : tab === 'financial' ? 'Financeiro' : tab === 'withdrawals' ? 'Saques' : 'Usuarios'}
+                {tab === 'overview' ? 'Geral' : tab === 'financial' ? 'Financ.' : tab === 'withdrawals' ? 'Saques' : tab === 'users' ? 'Usuarios' : 'Midias'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -717,6 +769,101 @@ export default function AdminDashboard() {
                   </View>
                 ))}
               </>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'media' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Gestao de Midias</Text>
+            
+            {/* Add Media Form */}
+            <View style={styles.mediaForm} data-testid="admin-media-form">
+              <TextInput
+                style={styles.mediaInput}
+                value={newMediaUrl}
+                onChangeText={setNewMediaUrl}
+                placeholder="URL da imagem ou video"
+                placeholderTextColor="#94A3B8"
+                data-testid="media-url-input"
+              />
+              <TextInput
+                style={styles.mediaInput}
+                value={newMediaTitle}
+                onChangeText={setNewMediaTitle}
+                placeholder="Titulo (ex: Banner iToke)"
+                placeholderTextColor="#94A3B8"
+                data-testid="media-title-input"
+              />
+              <View style={styles.mediaTypeRow}>
+                <TouchableOpacity
+                  style={[styles.mediaTypeBtn, newMediaType === 'image' && styles.mediaTypeBtnActive]}
+                  onPress={() => setNewMediaType('image')}
+                >
+                  <Ionicons name="image" size={16} color={newMediaType === 'image' ? '#FFF' : '#64748B'} />
+                  <Text style={[styles.mediaTypeBtnText, newMediaType === 'image' && { color: '#FFF' }]}>Imagem</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mediaTypeBtn, newMediaType === 'video' && styles.mediaTypeBtnActive]}
+                  onPress={() => setNewMediaType('video')}
+                >
+                  <Ionicons name="videocam" size={16} color={newMediaType === 'video' ? '#FFF' : '#64748B'} />
+                  <Text style={[styles.mediaTypeBtnText, newMediaType === 'video' && { color: '#FFF' }]}>Video</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.mediaAddBtn, addingMedia && { opacity: 0.6 }]}
+                onPress={handleAddMedia}
+                disabled={addingMedia}
+                data-testid="media-add-btn"
+              >
+                {addingMedia ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle" size={18} color="#FFF" />
+                    <Text style={styles.mediaAddBtnText}>Adicionar Midia</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Media List */}
+            {mediaLoading ? (
+              <View style={styles.financialLoading}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+              </View>
+            ) : mediaList.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="images-outline" size={32} color="#CBD5E1" />
+                <Text style={styles.emptyText}>Nenhuma midia cadastrada</Text>
+              </View>
+            ) : (
+              mediaList.map((m) => (
+                <View key={m.media_id} style={styles.mediaItem} data-testid={`admin-media-${m.media_id}`}>
+                  <View style={styles.mediaItemLeft}>
+                    <View style={[styles.mediaItemIcon, m.type === 'video' ? { backgroundColor: '#FEF2F2' } : { backgroundColor: '#EFF6FF' }]}>
+                      <Ionicons name={m.type === 'video' ? 'videocam' : 'image'} size={18} color={m.type === 'video' ? '#EF4444' : '#3B82F6'} />
+                    </View>
+                    <View style={styles.mediaItemInfo}>
+                      <Text style={styles.mediaItemTitle} numberOfLines={1}>{m.title}</Text>
+                      <Text style={styles.mediaItemUrl} numberOfLines={1}>{m.url}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.mediaDeleteBtn}
+                    onPress={() => handleDeleteMedia(m.media_id)}
+                    disabled={deletingMediaId === m.media_id}
+                    data-testid={`media-delete-${m.media_id}`}
+                  >
+                    {deletingMediaId === m.media_id ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ))
             )}
           </View>
         )}
@@ -1584,5 +1731,105 @@ const styles = StyleSheet.create({
   unblockBtn: {
     borderColor: '#D1FAE5',
     backgroundColor: '#ECFDF5',
+  },
+  // Media management styles
+  mediaForm: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  mediaInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  mediaTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  mediaTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  mediaTypeBtnActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  mediaTypeBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  mediaAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  mediaAddBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  mediaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  mediaItemLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  mediaItemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaItemInfo: {
+    flex: 1,
+  },
+  mediaItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  mediaItemUrl: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  mediaDeleteBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
   },
 });

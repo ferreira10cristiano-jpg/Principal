@@ -191,12 +191,17 @@ export const ShareInviteModal: React.FC<ShareInviteModalProps> = ({
               <Ionicons name="mail" size={22} color="#FFFFFF" />
               <Text style={styles.emailText}>E-mail</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.instagramButton} onPress={handleShareNative}>
+              <Ionicons name="logo-instagram" size={22} color="#FFFFFF" />
+              <Text style={styles.instagramText}>Instagram</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Other share */}
           <TouchableOpacity style={styles.otherShare} onPress={handleShareNative}>
             <Ionicons name="share-outline" size={18} color="#94A3B8" />
-            <Text style={styles.otherShareText}>Compartilhar de outra forma</Text>
+            <Text style={styles.otherShareText}>Outras redes</Text>
           </TouchableOpacity>
 
           {/* Referral Code */}
@@ -306,7 +311,7 @@ const styles = StyleSheet.create({
   },
   shareButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     marginBottom: 14,
   },
   whatsappButton: {
@@ -315,14 +320,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#25D366',
-    paddingVertical: 14,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 5,
   },
   whatsappText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   emailButton: {
     flex: 1,
@@ -330,14 +335,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#3B82F6',
-    paddingVertical: 14,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 5,
   },
   emailText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  instagramButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E1306C',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 5,
+  },
+  instagramText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   otherShare: {
     flexDirection: 'row',
