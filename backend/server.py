@@ -2205,6 +2205,89 @@ async def delete_media(media_id: str, user: dict = Depends(get_current_user)):
     
     return {"message": "Midia removida", "media_id": media_id}
 
+@api_router.post("/admin/media/generate-image")
+async def generate_media_image(data: dict, user: dict = Depends(get_current_user)):
+    """Generate an image using AI based on a theme/prompt"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Prompt/tema obrigatorio")
+    
+    import base64
+    from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+    
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Chave de API nao configurada")
+    
+    image_gen = OpenAIImageGeneration(api_key=api_key)
+    
+    full_prompt = f"Create a professional marketing image for a loyalty/discount app called iToke. Theme: {prompt}. Style: modern, clean, vibrant colors, suitable for social media sharing."
+    
+    images = await image_gen.generate_images(
+        prompt=full_prompt,
+        model="gpt-image-1",
+        number_of_images=1
+    )
+    
+    if not images or len(images) == 0:
+        raise HTTPException(status_code=500, detail="Falha ao gerar imagem")
+    
+    image_base64 = base64.b64encode(images[0]).decode('utf-8')
+    
+    # Save as media asset with base64 data URI
+    media_id = f"media_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc)
+    
+    data_uri = f"data:image/png;base64,{image_base64}"
+    
+    asset = {
+        "media_id": media_id,
+        "url": data_uri,
+        "title": data.get("title", prompt[:50]),
+        "type": "image",
+        "active": True,
+        "ai_generated": True,
+        "prompt": prompt,
+        "created_by": user["user_id"],
+        "created_at": now,
+    }
+    await db.media_assets.insert_one(asset)
+    asset.pop("_id", None)
+    
+    return asset
+
+@api_router.post("/admin/media/generate-text")
+async def generate_engagement_text(data: dict, user: dict = Depends(get_current_user)):
+    """Generate engagement text using AI"""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    theme = data.get("theme", "").strip()
+    
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Chave de API nao configurada")
+    
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=f"admin_text_{uuid.uuid4().hex[:8]}",
+        system_message="Voce e um copywriter especialista em marketing digital para apps de fidelidade e descontos. Escreva textos curtos, persuasivos e engajadores em portugues brasileiro. Maximo 2 frases. Nao use emojis. Nao use aspas."
+    )
+    
+    prompt_text = f"Crie um titulo de engajamento para uma midia de divulgacao do app iToke (app de fidelidade e descontos)."
+    if theme:
+        prompt_text += f" Tema: {theme}"
+    
+    user_msg = UserMessage(text=prompt_text)
+    response = await chat.send_message(user_msg)
+    
+    return {"text": response.strip()}
+
 class EmailLoginRequest(BaseModel):
     email: str
     name: str

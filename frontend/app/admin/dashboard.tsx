@@ -87,6 +87,9 @@ export default function AdminDashboard() {
   const [newMediaType, setNewMediaType] = useState<'image' | 'video'>('image');
   const [addingMedia, setAddingMedia] = useState(false);
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatingText, setGeneratingText] = useState(false);
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -250,6 +253,34 @@ export default function AdminDashboard() {
       if (typeof window !== 'undefined') window.alert(err.message || 'Erro');
     } finally {
       setDeletingMediaId(null);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!aiPrompt.trim()) return;
+    setGeneratingImage(true);
+    try {
+      const result = await api.generateMediaImage(aiPrompt.trim(), newMediaTitle.trim() || undefined);
+      setAiPrompt('');
+      setNewMediaTitle('');
+      fetchMedia();
+      if (typeof window !== 'undefined') window.alert('Imagem gerada com sucesso!');
+    } catch (err: any) {
+      if (typeof window !== 'undefined') window.alert(err.message || 'Erro ao gerar imagem');
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
+  const handleGenerateText = async () => {
+    setGeneratingText(true);
+    try {
+      const result = await api.generateEngagementText(newMediaTitle.trim() || undefined);
+      setNewMediaTitle(result.text);
+    } catch (err: any) {
+      if (typeof window !== 'undefined') window.alert(err.message || 'Erro ao gerar texto');
+    } finally {
+      setGeneratingText(false);
     }
   };
 
@@ -779,22 +810,38 @@ export default function AdminDashboard() {
             
             {/* Add Media Form */}
             <View style={styles.mediaForm} data-testid="admin-media-form">
+              <View style={styles.mediaTitleRow}>
+                <TextInput
+                  style={[styles.mediaInput, { flex: 1 }]}
+                  value={newMediaTitle}
+                  onChangeText={setNewMediaTitle}
+                  placeholder="Titulo / Descricao"
+                  placeholderTextColor="#94A3B8"
+                  data-testid="media-title-input"
+                />
+                <TouchableOpacity
+                  style={[styles.magicBtn, generatingText && { opacity: 0.5 }]}
+                  onPress={handleGenerateText}
+                  disabled={generatingText}
+                  data-testid="ai-text-btn"
+                >
+                  {generatingText ? (
+                    <ActivityIndicator size="small" color="#8B5CF6" />
+                  ) : (
+                    <Ionicons name="sparkles" size={18} color="#8B5CF6" />
+                  )}
+                </TouchableOpacity>
+              </View>
+
               <TextInput
                 style={styles.mediaInput}
                 value={newMediaUrl}
                 onChangeText={setNewMediaUrl}
-                placeholder="URL da imagem ou video"
+                placeholder="URL da imagem ou video (opcional se gerar com IA)"
                 placeholderTextColor="#94A3B8"
                 data-testid="media-url-input"
               />
-              <TextInput
-                style={styles.mediaInput}
-                value={newMediaTitle}
-                onChangeText={setNewMediaTitle}
-                placeholder="Titulo (ex: Banner iToke)"
-                placeholderTextColor="#94A3B8"
-                data-testid="media-title-input"
-              />
+
               <View style={styles.mediaTypeRow}>
                 <TouchableOpacity
                   style={[styles.mediaTypeBtn, newMediaType === 'image' && styles.mediaTypeBtnActive]}
@@ -811,6 +858,7 @@ export default function AdminDashboard() {
                   <Text style={[styles.mediaTypeBtnText, newMediaType === 'video' && { color: '#FFF' }]}>Video</Text>
                 </TouchableOpacity>
               </View>
+
               <TouchableOpacity
                 style={[styles.mediaAddBtn, addingMedia && { opacity: 0.6 }]}
                 onPress={handleAddMedia}
@@ -822,10 +870,41 @@ export default function AdminDashboard() {
                 ) : (
                   <>
                     <Ionicons name="add-circle" size={18} color="#FFF" />
-                    <Text style={styles.mediaAddBtnText}>Adicionar Midia</Text>
+                    <Text style={styles.mediaAddBtnText}>Adicionar URL</Text>
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* AI Generation */}
+              <View style={styles.aiSection}>
+                <Text style={styles.aiSectionTitle}>Gerar com IA</Text>
+                <TextInput
+                  style={styles.mediaInput}
+                  value={aiPrompt}
+                  onChangeText={setAiPrompt}
+                  placeholder="Descreva o tema da imagem (ex: Desconto de verao)"
+                  placeholderTextColor="#94A3B8"
+                  data-testid="ai-prompt-input"
+                />
+                <TouchableOpacity
+                  style={[styles.aiGenerateBtn, generatingImage && { opacity: 0.6 }]}
+                  onPress={handleGenerateImage}
+                  disabled={generatingImage}
+                  data-testid="ai-generate-image-btn"
+                >
+                  {generatingImage ? (
+                    <>
+                      <ActivityIndicator size="small" color="#FFF" />
+                      <Text style={styles.aiGenerateBtnText}>Gerando imagem...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={18} color="#FFF" />
+                      <Text style={styles.aiGenerateBtnText}>Gerar Imagem com IA</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Media List */}
@@ -847,7 +926,9 @@ export default function AdminDashboard() {
                     </View>
                     <View style={styles.mediaItemInfo}>
                       <Text style={styles.mediaItemTitle} numberOfLines={1}>{m.title}</Text>
-                      <Text style={styles.mediaItemUrl} numberOfLines={1}>{m.url}</Text>
+                      <Text style={styles.mediaItemUrl} numberOfLines={1}>
+                        {m.ai_generated ? 'Gerado por IA' : m.url?.substring(0, 40)}
+                      </Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -1742,6 +1823,21 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     gap: 10,
   },
+  mediaTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  magicBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: '#F5F3FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
   mediaInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
@@ -1787,6 +1883,32 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   mediaAddBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  aiSection: {
+    marginTop: 8,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 10,
+  },
+  aiSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  aiGenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  aiGenerateBtnText: {
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',

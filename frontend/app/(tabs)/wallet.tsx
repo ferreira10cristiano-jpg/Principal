@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
   Linking,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -30,6 +31,10 @@ export default function WalletScreen() {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [shareType, setShareType] = useState<'friend' | 'establishment'>('friend');
   const [mediaAssets, setMediaAssets] = useState<any[]>([]);
+
+  // Fullscreen media viewer
+  const [viewingMedia, setViewingMedia] = useState<any>(null);
+  const [showMediaViewer, setShowMediaViewer] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -68,17 +73,22 @@ export default function WalletScreen() {
     }
   };
 
-  const handleDownloadMedia = (url: string) => {
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-    } else {
-      Linking.openURL(url);
-    }
+  const handleMediaClick = (media: any) => {
+    setViewingMedia(media);
+    setShowMediaViewer(true);
+  };
+
+  const handlePostFromViewer = () => {
+    setShowMediaViewer(false);
+    setTimeout(() => {
+      setShareType('friend');
+      setShareModalVisible(true);
+    }, 300);
   };
 
   if (isLoading) {
     return (
-      <View style={[s.root, s.centered, { paddingTop: insets.top }]}>
+      <View style={[st.root, st.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#10B981" />
       </View>
     );
@@ -96,167 +106,136 @@ export default function WalletScreen() {
   const fmtPrice = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[st.root, { paddingTop: insets.top }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
+        contentContainerStyle={st.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" colors={['#10B981']} />}
       >
         {/* ===== HERO ===== */}
-        <View style={s.hero} data-testid="wallet-hero">
-          <Text style={s.heroTitle}>Creditos</Text>
-          <View style={s.heroBalanceRow}>
-            <Text style={s.heroCurrency}>R$</Text>
-            <Text style={s.heroBalance}>{balance.toFixed(2)}</Text>
+        <View style={st.hero} data-testid="wallet-hero">
+          <Text style={st.heroTitle}>Creditos</Text>
+          <View style={st.heroBalanceRow}>
+            <Text style={st.heroCurrency}>R$</Text>
+            <Text style={st.heroBalance}>{balance.toFixed(2)}</Text>
           </View>
-          <Text style={s.heroImpact}>Seus creditos podem ser usados para pagar suas compras!</Text>
-          <View style={s.heroMeta}>
-            <View style={s.heroSavingsPill}>
+          <Text style={st.heroImpact}>Seus creditos podem ser usados para pagar suas compras!</Text>
+          <View style={st.heroMeta}>
+            <View style={st.heroSavingsPill}>
               <Ionicons name="trending-up" size={13} color="#6EE7B7" />
-              <Text style={s.heroSavingsText}>Economia total: {fmtPrice(totalSavings)}</Text>
+              <Text style={st.heroSavingsText}>Economia total: {fmtPrice(totalSavings)}</Text>
             </View>
-            <TouchableOpacity
-              style={s.helpBtn}
-              onPress={() => router.push('/(tabs)/help')}
-              activeOpacity={0.7}
-              data-testid="how-to-earn-btn"
-            >
+            <TouchableOpacity style={st.helpBtn} onPress={() => router.push('/(tabs)/help')} activeOpacity={0.7} data-testid="how-to-earn-btn">
               <Ionicons name="help-circle-outline" size={15} color="#10B981" />
-              <Text style={s.helpBtnText}>Como ganhar creditos</Text>
+              <Text style={st.helpBtnText}>Como ganhar creditos</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* ===== TOKENS ===== */}
-        <View style={s.section}>
-          <View style={s.tokenCard} data-testid="wallet-tokens">
-            <View style={s.tokenLeft}>
-              <View style={s.tokenIcon}>
-                <Ionicons name="ticket" size={18} color="#10B981" />
-              </View>
+        <View style={st.section}>
+          <View style={st.tokenCard} data-testid="wallet-tokens">
+            <View style={st.tokenLeft}>
+              <View style={st.tokenIcon}><Ionicons name="ticket" size={18} color="#10B981" /></View>
               <View>
-                <Text style={s.tokenTitle}>Meus Tokens</Text>
-                <Text style={s.tokenSub}>Para gerar QR Codes</Text>
+                <Text style={st.tokenTitle}>Meus Tokens</Text>
+                <Text style={st.tokenSub}>Para gerar QR Codes</Text>
               </View>
             </View>
-            <Text style={s.tokenCount}>{tokens}</Text>
-            <TouchableOpacity
-              style={s.tokenBuyBtn}
-              onPress={() => router.push('/buy-tokens')}
-              activeOpacity={0.7}
-              data-testid="buy-tokens-btn"
-            >
+            <Text style={st.tokenCount}>{tokens}</Text>
+            <TouchableOpacity style={st.tokenBuyBtn} onPress={() => router.push('/buy-tokens')} activeOpacity={0.7} data-testid="buy-tokens-btn">
               <Ionicons name="add" size={16} color="#10B981" />
-              <Text style={s.tokenBuyText}>Comprar</Text>
+              <Text style={st.tokenBuyText}>Comprar</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* ===== GANHE CREDITOS INDICANDO ===== */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Ganhe creditos indicando</Text>
-          <View style={s.referralCard} data-testid="wallet-referral">
-            <View style={s.referralBtns}>
-              <TouchableOpacity
-                style={s.referralBtn}
-                onPress={() => { setShareType('friend'); setShareModalVisible(true); }}
-                activeOpacity={0.7}
-                data-testid="share-friend-btn"
-              >
-                <View style={s.referralBtnIcon}>
-                  <Ionicons name="person-add-outline" size={18} color="#10B981" />
-                </View>
-                <Text style={s.referralBtnLabel}>Indicar Amigo</Text>
+        <View style={st.section}>
+          <Text style={st.sectionTitle}>Ganhe creditos indicando</Text>
+          <View style={st.referralCard} data-testid="wallet-referral">
+            <View style={st.referralBtns}>
+              <TouchableOpacity style={st.referralBtn} onPress={() => { setShareType('friend'); setShareModalVisible(true); }} activeOpacity={0.7} data-testid="share-friend-btn">
+                <View style={st.referralBtnIcon}><Ionicons name="person-add-outline" size={18} color="#10B981" /></View>
+                <Text style={st.referralBtnLabel}>Indicar Amigo</Text>
               </TouchableOpacity>
-              <View style={s.referralDivider} />
-              <TouchableOpacity
-                style={s.referralBtn}
-                onPress={() => { setShareType('establishment'); setShareModalVisible(true); }}
-                activeOpacity={0.7}
-                data-testid="share-store-btn"
-              >
-                <View style={s.referralBtnIcon}>
-                  <Ionicons name="storefront-outline" size={18} color="#10B981" />
-                </View>
-                <Text style={s.referralBtnLabel}>Indicar Loja</Text>
+              <View style={st.referralDivider} />
+              <TouchableOpacity style={st.referralBtn} onPress={() => { setShareType('establishment'); setShareModalVisible(true); }} activeOpacity={0.7} data-testid="share-store-btn">
+                <View style={st.referralBtnIcon}><Ionicons name="storefront-outline" size={18} color="#10B981" /></View>
+                <Text style={st.referralBtnLabel}>Indicar Loja</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={s.codeRow} onPress={handleCopyCode} activeOpacity={0.6}>
+            <TouchableOpacity style={st.codeRow} onPress={handleCopyCode} activeOpacity={0.6}>
               <Ionicons name="link-outline" size={14} color="#475569" />
-              <Text style={s.codeText}>{networkData?.referral_code || '---'}</Text>
+              <Text style={st.codeText}>{networkData?.referral_code || '---'}</Text>
               <Ionicons name="copy-outline" size={14} color="#475569" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* ===== BANCO DE MIDIA ===== */}
+        {/* ===== GALERIA DE MIDIAS ===== */}
         {mediaAssets.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Materiais para divulgar</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.mediaScroll}>
+          <View style={st.section}>
+            <Text style={st.sectionTitle}>Materiais para divulgar</Text>
+            <View style={st.mediaGrid}>
               {mediaAssets.map((asset) => (
                 <TouchableOpacity
                   key={asset.media_id}
-                  style={s.mediaCard}
-                  onPress={() => handleDownloadMedia(asset.url)}
+                  style={st.mediaCard}
+                  onPress={() => handleMediaClick(asset)}
                   activeOpacity={0.7}
                   data-testid={`media-${asset.media_id}`}
                 >
                   {asset.type === 'image' ? (
-                    <Image source={{ uri: asset.url }} style={s.mediaThumb} resizeMode="cover" />
+                    <Image source={{ uri: asset.url }} style={st.mediaThumb} resizeMode="cover" />
                   ) : (
-                    <View style={s.mediaVideoThumb}>
-                      <Ionicons name="play-circle" size={32} color="#10B981" />
+                    <View style={st.mediaVideoThumb}>
+                      <Ionicons name="play-circle" size={36} color="#10B981" />
                     </View>
                   )}
-                  <Text style={s.mediaTitle} numberOfLines={1}>{asset.title}</Text>
-                  <View style={s.mediaDownload}>
-                    <Ionicons name="download-outline" size={14} color="#10B981" />
-                    <Text style={s.mediaDownloadText}>Baixar</Text>
+                  <View style={st.mediaCardFooter}>
+                    <Text style={st.mediaTitle} numberOfLines={1}>{asset.title}</Text>
+                    <Ionicons name="expand-outline" size={14} color="#475569" />
                   </View>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
           </View>
         )}
 
         {/* ===== MINHA REDE ===== */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Minha Rede</Text>
-          <View style={s.netCard} data-testid="wallet-network">
-            {/* Header */}
-            <View style={s.netHeader}>
-              <Text style={[s.netHeaderCell, { flex: 2 }]}></Text>
-              <Text style={s.netHeaderCell}>Indicados</Text>
-              <Text style={s.netHeaderCell}>Ativos</Text>
-              <Text style={s.netHeaderCell}>Creditos</Text>
+        <View style={st.section}>
+          <Text style={st.sectionTitle}>Minha Rede</Text>
+          <View style={st.netCard} data-testid="wallet-network">
+            <View style={st.netHeader}>
+              <Text style={[st.netHeaderCell, { flex: 2 }]}></Text>
+              <Text style={st.netHeaderCell}>Indicados</Text>
+              <Text style={st.netHeaderCell}>Ativos</Text>
+              <Text style={st.netHeaderCell}>Creditos</Text>
             </View>
-            {/* Level rows */}
             <NetRow label="Nivel 1" sub="Diretos" color="#10B981" total={l1.total} active={l1.active} credits={l1.credits} />
-            <View style={s.netSep} />
+            <View style={st.netSep} />
             <NetRow label="Nivel 2" sub="" color="#3B82F6" total={l2.total} active={l2.active} credits={l2.credits} />
-            <View style={s.netSep} />
+            <View style={st.netSep} />
             <NetRow label="Nivel 3" sub="" color="#F59E0B" total={l3.total} active={l3.active} credits={l3.credits} />
-            <View style={s.netSep} />
+            <View style={st.netSep} />
             <NetRow label="Estabelecimentos" sub="" color="#8B5CF6" total={est.total} active={est.active} credits={est.credits} />
           </View>
         </View>
 
         {/* ===== HISTORICO ===== */}
         {transactions.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Historico</Text>
-            <View style={s.txList}>
+          <View style={st.section}>
+            <Text style={st.sectionTitle}>Historico</Text>
+            <View style={st.txList}>
               {transactions.slice(0, 8).map((item: Transaction, index: number) => (
-                <View key={index} style={s.txRow}>
-                  <View style={[s.txDot, item.amount < 0 && { backgroundColor: '#EF4444' }]} />
-                  <View style={s.txBody}>
-                    <Text style={s.txDesc} numberOfLines={1}>{item.description}</Text>
-                    <Text style={s.txDate}>
-                      {new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                    </Text>
+                <View key={index} style={st.txRow}>
+                  <View style={[st.txDot, item.amount < 0 && { backgroundColor: '#EF4444' }]} />
+                  <View style={st.txBody}>
+                    <Text style={st.txDesc} numberOfLines={1}>{item.description}</Text>
+                    <Text style={st.txDate}>{new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</Text>
                   </View>
-                  <Text style={[s.txAmt, item.amount < 0 && { color: '#EF4444' }]}>
+                  <Text style={[st.txAmt, item.amount < 0 && { color: '#EF4444' }]}>
                     {item.amount >= 0 ? '+' : ''}R$ {item.amount.toFixed(2)}
                   </Text>
                 </View>
@@ -267,6 +246,42 @@ export default function WalletScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ===== FULLSCREEN MEDIA VIEWER MODAL ===== */}
+      <Modal visible={showMediaViewer} animationType="fade" transparent onRequestClose={() => setShowMediaViewer(false)}>
+        <View style={st.viewerOverlay}>
+          <View style={st.viewerContainer} data-testid="media-viewer-modal">
+            {/* Close button */}
+            <TouchableOpacity style={st.viewerClose} onPress={() => setShowMediaViewer(false)} data-testid="media-viewer-close">
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            {viewingMedia && (
+              <>
+                {viewingMedia.type === 'image' ? (
+                  <Image source={{ uri: viewingMedia.url }} style={st.viewerImage} resizeMode="contain" />
+                ) : (
+                  <View style={st.viewerVideo}>
+                    <Ionicons name="play-circle" size={64} color="#10B981" />
+                    <Text style={st.viewerVideoText}>Video</Text>
+                  </View>
+                )}
+                <Text style={st.viewerTitle}>{viewingMedia.title}</Text>
+                <View style={st.viewerButtons}>
+                  <TouchableOpacity style={st.viewerBackBtn} onPress={() => setShowMediaViewer(false)} data-testid="media-viewer-back">
+                    <Ionicons name="arrow-back" size={18} color="#CBD5E1" />
+                    <Text style={st.viewerBackText}>Voltar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={st.viewerPostBtn} onPress={handlePostFromViewer} data-testid="media-viewer-post">
+                    <Ionicons name="share-social" size={18} color="#FFF" />
+                    <Text style={st.viewerPostText}>Postar / Indicar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <ShareInviteModal
         visible={shareModalVisible}
@@ -283,175 +298,97 @@ function NetRow({ label, sub, color, total, active, credits }: {
   label: string; sub: string; color: string; total: number; active: number; credits: number;
 }) {
   return (
-    <View style={s.netRow}>
-      <View style={[s.netCell, { flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-        <View style={[s.netDot, { backgroundColor: color }]} />
+    <View style={st.netRow}>
+      <View style={[st.netCell, { flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+        <View style={[st.netDot, { backgroundColor: color }]} />
         <View>
-          <Text style={s.netLabel}>{label}</Text>
-          {sub ? <Text style={s.netSub}>{sub}</Text> : null}
+          <Text style={st.netLabel}>{label}</Text>
+          {sub ? <Text style={st.netSub}>{sub}</Text> : null}
         </View>
       </View>
-      <Text style={s.netValue}>{total}</Text>
-      <Text style={[s.netValue, { color: active > 0 ? '#10B981' : '#475569' }]}>{active}</Text>
-      <Text style={[s.netValue, { color: credits > 0 ? '#10B981' : '#475569' }]}>
+      <Text style={st.netValue}>{total}</Text>
+      <Text style={[st.netValue, { color: active > 0 ? '#10B981' : '#475569' }]}>{active}</Text>
+      <Text style={[st.netValue, { color: credits > 0 ? '#10B981' : '#475569' }]}>
         {credits > 0 ? `R$${credits.toFixed(0)}` : '—'}
       </Text>
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B0F1A' },
   centered: { justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingBottom: 20 },
 
-  /* HERO */
   hero: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#E2E8F0',
-    letterSpacing: -0.5,
-  },
+  heroTitle: { fontSize: 28, fontWeight: '800', color: '#E2E8F0', letterSpacing: -0.5 },
   heroBalanceRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 8 },
   heroCurrency: { fontSize: 20, fontWeight: '600', color: '#10B981', marginRight: 4 },
   heroBalance: { fontSize: 46, fontWeight: '800', color: '#10B981', letterSpacing: -1.5 },
-  heroImpact: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  heroMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 14,
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  heroSavingsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#10B98110',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
+  heroImpact: { fontSize: 14, fontWeight: '600', color: '#94A3B8', marginTop: 8, lineHeight: 20 },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 10, flexWrap: 'wrap' },
+  heroSavingsPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#10B98110', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   heroSavingsText: { fontSize: 12, fontWeight: '600', color: '#6EE7B7' },
-  helpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#10B98130',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
+  helpBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#10B98130', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   helpBtnText: { fontSize: 12, fontWeight: '600', color: '#10B981' },
 
-  /* SECTIONS */
   section: { marginTop: 28, paddingHorizontal: 24 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#CBD5E1', marginBottom: 14 },
 
-  /* TOKENS */
-  tokenCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-  },
+  tokenCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1E293B' },
   tokenLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  tokenIcon: {
-    width: 38, height: 38, borderRadius: 10,
-    backgroundColor: '#10B98115', justifyContent: 'center', alignItems: 'center',
-  },
+  tokenIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#10B98115', justifyContent: 'center', alignItems: 'center' },
   tokenTitle: { fontSize: 14, fontWeight: '600', color: '#E2E8F0' },
   tokenSub: { fontSize: 11, color: '#475569', marginTop: 1 },
   tokenCount: { fontSize: 26, fontWeight: '800', color: '#E2E8F0', marginRight: 14 },
-  tokenBuyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderColor: '#10B98140', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 8,
-  },
+  tokenBuyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#10B98140', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   tokenBuyText: { fontSize: 13, fontWeight: '600', color: '#10B981' },
 
-  /* REFERRAL */
-  referralCard: {
-    backgroundColor: '#111827', borderRadius: 16,
-    borderWidth: 1, borderColor: '#1E293B', overflow: 'hidden',
-  },
+  referralCard: { backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', overflow: 'hidden' },
   referralBtns: { flexDirection: 'row', alignItems: 'center' },
   referralBtn: { flex: 1, alignItems: 'center', paddingVertical: 18, gap: 8 },
-  referralBtnIcon: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#10B98112', justifyContent: 'center', alignItems: 'center',
-  },
+  referralBtnIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#10B98112', justifyContent: 'center', alignItems: 'center' },
   referralBtnLabel: { fontSize: 13, fontWeight: '600', color: '#CBD5E1' },
   referralDivider: { width: 1, height: 40, backgroundColor: '#1E293B' },
-  codeRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 12,
-    borderTopWidth: 1, borderTopColor: '#1E293B', backgroundColor: '#0D111D',
-  },
+  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#1E293B', backgroundColor: '#0D111D' },
   codeText: { fontSize: 13, fontWeight: '700', color: '#475569', letterSpacing: 1.5 },
 
-  /* MEDIA */
-  mediaScroll: { marginHorizontal: -4 },
-  mediaCard: {
-    width: 140, backgroundColor: '#111827', borderRadius: 14,
-    borderWidth: 1, borderColor: '#1E293B', marginHorizontal: 4, overflow: 'hidden',
-  },
-  mediaThumb: { width: '100%', height: 100 },
-  mediaVideoThumb: {
-    width: '100%', height: 100,
-    backgroundColor: '#0D111D', justifyContent: 'center', alignItems: 'center',
-  },
-  mediaTitle: { fontSize: 12, fontWeight: '600', color: '#CBD5E1', paddingHorizontal: 10, paddingTop: 8 },
-  mediaDownload: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 8,
-  },
-  mediaDownloadText: { fontSize: 11, fontWeight: '600', color: '#10B981' },
+  /* Media Gallery (Grid) */
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  mediaCard: { width: '47%', backgroundColor: '#111827', borderRadius: 14, borderWidth: 1, borderColor: '#1E293B', overflow: 'hidden' },
+  mediaThumb: { width: '100%', height: 110 },
+  mediaVideoThumb: { width: '100%', height: 110, backgroundColor: '#0D111D', justifyContent: 'center', alignItems: 'center' },
+  mediaCardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 8 },
+  mediaTitle: { fontSize: 12, fontWeight: '600', color: '#CBD5E1', flex: 1, marginRight: 4 },
 
-  /* NETWORK TABLE */
-  netCard: {
-    backgroundColor: '#111827', borderRadius: 16,
-    borderWidth: 1, borderColor: '#1E293B', overflow: 'hidden',
-  },
-  netHeader: {
-    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: '#0D111D', borderBottomWidth: 1, borderBottomColor: '#1E293B',
-  },
-  netHeaderCell: {
-    flex: 1, fontSize: 11, fontWeight: '700', color: '#475569',
-    textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center',
-  },
+  /* Fullscreen Viewer */
+  viewerOverlay: { flex: 1, backgroundColor: '#000000EE', justifyContent: 'center', alignItems: 'center' },
+  viewerContainer: { width: '92%', maxWidth: 440, maxHeight: '88%', alignItems: 'center' },
+  viewerClose: { position: 'absolute', top: -40, right: 0, zIndex: 10, padding: 8 },
+  viewerImage: { width: '100%', height: 320, borderRadius: 16 },
+  viewerVideo: { width: '100%', height: 320, borderRadius: 16, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center' },
+  viewerVideoText: { color: '#475569', marginTop: 8, fontSize: 14 },
+  viewerTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', marginTop: 16, textAlign: 'center' },
+  viewerButtons: { flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' },
+  viewerBackBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#334155' },
+  viewerBackText: { fontSize: 14, fontWeight: '600', color: '#CBD5E1' },
+  viewerPostBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, backgroundColor: '#10B981' },
+  viewerPostText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+
+  /* Network Table */
+  netCard: { backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', overflow: 'hidden' },
+  netHeader: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#0D111D', borderBottomWidth: 1, borderBottomColor: '#1E293B' },
+  netHeaderCell: { flex: 1, fontSize: 11, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
   netRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   netCell: { flex: 1 },
   netDot: { width: 8, height: 8, borderRadius: 4 },
   netLabel: { fontSize: 13, fontWeight: '600', color: '#CBD5E1' },
   netSub: { fontSize: 10, color: '#475569', marginTop: 1 },
-  netValue: {
-    flex: 1, fontSize: 14, fontWeight: '700', color: '#CBD5E1', textAlign: 'center',
-  },
+  netValue: { flex: 1, fontSize: 14, fontWeight: '700', color: '#CBD5E1', textAlign: 'center' },
   netSep: { height: 1, backgroundColor: '#1E293B', marginHorizontal: 16 },
 
-  /* TRANSACTIONS */
-  txList: {
-    backgroundColor: '#111827', borderRadius: 16,
-    borderWidth: 1, borderColor: '#1E293B', paddingVertical: 4,
-  },
-  txRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 18, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1E293B',
-  },
+  txList: { backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', paddingVertical: 4 },
+  txRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
   txDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 12 },
   txBody: { flex: 1 },
   txDesc: { fontSize: 13, fontWeight: '500', color: '#CBD5E1' },

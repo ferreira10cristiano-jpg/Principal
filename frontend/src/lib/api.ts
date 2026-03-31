@@ -370,6 +370,20 @@ class ApiClient {
     });
   }
 
+  async generateMediaImage(prompt: string, title?: string) {
+    return this.request<any>('/admin/media/generate-image', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, title }),
+    });
+  }
+
+  async generateEngagementText(theme?: string) {
+    return this.request<any>('/admin/media/generate-text', {
+      method: 'POST',
+      body: JSON.stringify({ theme }),
+    });
+  }
+
   // Seed
   async seedData(force?: boolean) {
     const query = force ? '?force=true' : '';
